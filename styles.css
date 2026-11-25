@@ -122,3 +122,4 @@ body.modal-open{overflow:hidden}
   .yt-bigplay{width:56px;height:56px;font-size:24px}
   .edit-form{padding:12px}
 }
+.category-card.locked{opacity:.82}
