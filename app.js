@@ -309,18 +309,19 @@ function setupAudio(p) {
     if (id) {
       const list = driveSources(id);
       if (srcIdx < list.length - 1) { srcIdx++; audio.src = list[srcIdx]; audio.load(); return; }
-      showDrivePreview(id); return;
+      const er = audio.error;
+      showDrivePreview(id, `診斷：錯誤碼 ${er ? er.code : "?"}、網路狀態 ${audio.networkState}、已試 ${list.length} 個網址`); return;
     }
     showMediaError("音檔無法播放：請確認網址可直接開啟播放（https 直連 mp3）。");
   });
 }
-function showDrivePreview(id) {
+function showDrivePreview(id, diag = "") {
   const lessonId = activeLesson?.id; if (!lessonId) return;
   audioEl = null;
   $("mediaFrame").classList.remove("audio");
   $("mediaFrame").innerHTML = `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(id)}/preview" allow="autoplay" style="width:100%;height:100%;border:0"></iframe>`;
   const e = $("mediaError");
-  e.innerHTML = `已改用 Google Drive 內建播放器。此模式無法自動記錄進度與續播，聽完後請按：<button id="markDone" class="btn btn-primary btn-small" style="margin-left:8px">標記為已完成</button>`;
+  e.innerHTML = `已改用 Google Drive 內建播放器。此模式無法自動記錄進度與續播，聽完後請按：<button id="markDone" class="btn btn-primary btn-small" style="margin-left:8px">標記為已完成</button><br><small>${esc(diag)}</small>`;
   e.classList.remove("hidden");
   $("markDone").onclick = () => completeLesson(lessonId);
 }
