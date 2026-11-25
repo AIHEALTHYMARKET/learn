@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#101827"><meta name="referrer" content="strict-origin-when-cross-origin"><title>Unfinished｜學習中心</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c9a45e%27/%3E%3Ctext x=%2732%27 y=%2742%27 font-size=%2728%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%23172235%27 font-family=%27sans-serif%27%3EBS%3C/text%3E%3C/svg%3E">
+  <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c9a45e%27/%3E%3Ctext x=%2732%27 y=%2742%27 font-size=%2728%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%23172235%27 font-family=%27sans-serif%27%3EU%3C/text%3E%3C/svg%3E">
+  <!-- 分享縮圖（LINE／Facebook 預覽）：爬蟲讀不到後台上傳的圖，請把後台下載的 og-image.png 放在網站根目錄，
+       並把下面 og:image 改成完整網址，例如 https://你的帳號.github.io/倉庫名/og-image.png -->
+  <meta property="og:type" content="website"><meta property="og:title" content="Unfinished｜學習中心"><meta property="og:description" content="Unfinished 學習平台">
+  <meta property="og:image" content="og-image.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="og-image.png">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
@@ -12,8 +16,8 @@
   <noscript><p style="padding:24px;font-family:sans-serif">此網站需要啟用 JavaScript 才能使用。</p></noscript>
   <div id="loginScreen" class="login-screen">
     <div class="login-card">
-      <div class="brand-mark">Unfinished<span>+</span></div>
-      <p class="eyebrow">Unfinished LEARNING HUB</p>
+      <div class="brand-mark" data-logo="U">U</div>
+      <p class="eyebrow">UNFINISHED LEARNING HUB</p>
       <h1>把學習，變成持續前進的力量。</h1>
       <p class="muted">登入後即可查看開放課程、學習紀錄與個人筆記。部分專區須經管理員審核。</p>
       <button id="loginBtn" class="btn btn-primary btn-wide">使用 Google 帳號登入</button>
@@ -24,7 +28,7 @@
 
   <div id="appShell" class="app-shell hidden">
     <aside class="sidebar">
-      <div class="side-brand"><div class="brand-mark small">BS<span>+</span></div><div><b>BS GLOBAL</b><small>LEARNING HUB</small></div></div>
+      <div class="side-brand"><div class="brand-mark small" data-logo="U">U</div><div><b>Unfinished</b><small>LEARNING HUB</small></div></div>
       <div class="side-label">學習空間</div>
       <button class="nav-item active" data-view="home"><span>▦</span><i class="lf">學習總覽</i><i class="ls">總覽</i></button>
       <button class="nav-item" data-view="mp3"><span>♫</span><i class="lf">MP3 聆聽學習</i><i class="ls">MP3</i></button>
@@ -37,10 +41,10 @@
     </aside>
 
     <main class="main-area">
-      <header class="topbar"><div><p class="eyebrow" id="dateLabel">YOUR LEARNING SPACE</p><h2 id="pageTitle">學習總覽</h2></div><div class="top-actions"><span class="online-dot">● 已登入</span><button id="refreshBtn" class="icon-btn" title="重新整理">↻</button><button id="logoutTop" class="icon-btn logout-top" title="登出">登出</button></div></header>
+      <header class="topbar"><div><p class="eyebrow" id="dateLabel">Unfinished</p><h2 id="pageTitle">學習總覽</h2></div><div class="top-actions"><span class="online-dot">● 已登入</span><button id="refreshBtn" class="icon-btn" title="重新整理">↻</button><button id="logoutTop" class="icon-btn logout-top" title="登出">登出</button></div></header>
       <section id="approvalBanner" class="notice hidden"></section>
       <section id="view-home" class="view">
-        <div class="welcome-row"><div><p class="eyebrow">WELCOME BACK</p><h1>今天，向前學一點。</h1><p class="muted">每一次聆聽與理解，都會累積成下一次分享的底氣。</p></div><div class="welcome-orb">✦</div></div>
+        <div class="welcome-row"><div><p class="eyebrow">WELCOME BACK</p><h1>今天，向前學一點。</h1><p class="muted">每一次聆聽與理解，都會累積成下一次分享的底氣。</p></div><div class="welcome-orb" data-logo="✦">✦</div></div>
         <div class="stats-grid">
           <article class="stat-card stat-feature"><div class="stat-top"><span>整體學習進度</span><span class="stat-icon">◉</span></div><div class="stat-number" id="overallPercent">0%</div><div class="progress-track"><i id="overallBar"></i></div><small id="overallText">尚未開始學習</small></article>
           <article class="stat-card"><div class="stat-top"><span>已完成內容</span><span class="stat-icon">✓</span></div><div class="stat-number" id="completedCount">0</div><small>完成的音檔與課程</small></article>
@@ -58,8 +62,8 @@
       <section id="view-nutrition" class="view hidden"><div class="section-intro"><p class="eyebrow">NUTRITION ACADEMY</p><h1>營養課程</h1><p class="muted">系統化建立營養知識，讓每一次分享都有根據。</p></div><div id="nutritionCategories" class="category-grid"></div><div id="nutritionLessons" class="hidden"></div></section>
       <section id="view-reading" class="view hidden"><div class="section-intro"><p class="eyebrow">READING ROOM</p><h1>閱讀</h1><p class="muted">在網站內直接閱讀電子書。</p></div><div id="bookGrid" class="book-grid"></div></section>
       <section id="view-notes" class="view hidden"><div class="section-intro"><p class="eyebrow">MY KNOWLEDGE</p><h1>我的筆記</h1><p class="muted">集中回顧每一段學習留下的重點。</p></div><div id="allNotes" class="notes-grid"></div></section>
-      <section id="view-admin" class="view hidden"><div class="section-intro"><p class="eyebrow">CONTROL CENTER</p><h1>管理員後台</h1><p class="muted">管理分類、課程內容、審核會員與發布公告。</p></div>
-        <div class="admin-tabs"><button class="tab active" data-admin-tab="content">課程管理</button><button class="tab" data-admin-tab="members">分類申請</button><button class="tab" data-admin-tab="books">書本管理</button><button class="tab" data-admin-tab="announcements">公告管理</button></div>
+      <section id="view-admin" class="view hidden"><div class="section-intro"><p class="eyebrow">CONTROL CENTER</p><h1>管理員後台</h1><p class="muted">管理分類、課程內容與排序、審核會員與發布公告。</p></div>
+        <div class="admin-tabs"><button class="tab active" data-admin-tab="content">課程管理</button><button class="tab" data-admin-tab="members">分類申請</button><button class="tab" data-admin-tab="books">書本管理</button><button class="tab" data-admin-tab="announcements">公告管理</button><button class="tab" data-admin-tab="branding">品牌 Logo</button></div>
         <div id="admin-content" class="admin-pane">
           <div class="admin-columns"><div class="panel"><h3>新增分類</h3><form id="categoryForm" class="form-stack"><label>所屬專區<select id="categoryType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>分類名稱<input id="categoryName" required placeholder="例如：新人必修"></label><label>簡介<input id="categoryDesc" placeholder="簡短描述"></label><label class="check-row"><input id="categoryApproval" type="checkbox"> 此分類需要管理員審核</label><button class="btn btn-primary">新增分類</button></form></div>
           <div class="panel"><h3>新增學習內容</h3><form id="lessonForm" class="form-stack"><label>所屬專區<select id="lessonType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>選擇分類<select id="lessonCategory" required></select></label><label>內容標題<input id="lessonTitle" required placeholder="輸入課程名稱"></label><label>內容說明<textarea id="lessonDesc" rows="2" placeholder="學習重點或簡介"></textarea></label><label id="mediaLabel"><span id="mediaLabelText">MP3 來源</span><input id="lessonMedia" required placeholder="貼上 Drive 連結或 audio/檔名.mp3"></label><p class="form-hint" id="mediaHint">請先將 MP3 設定為「知道連結的任何人可檢視」，再貼上檔案 ID。</p><button class="btn btn-primary">新增學習內容</button></form></div></div>
@@ -73,8 +77,32 @@
         </div>
         <div id="admin-books" class="admin-pane hidden"><div class="admin-columns"><div class="panel"><h3>新增書本</h3><form id="bookForm" class="form-stack"><label>書名<input id="bookTitle" required placeholder="輸入書名"></label><label>簡介<input id="bookDesc" placeholder="選填"></label><label>FlipHTML5 連結（也可貼嵌入碼）<input id="bookLink" required placeholder="https://online.fliphtml5.com/xxxx/yyyy/"></label><label>封面縮圖（選擇圖片，會自動縮小）<input id="bookCoverFile" type="file" accept="image/*"></label><label>或貼封面圖片網址（https，選填）<input id="bookCoverUrl" placeholder="https://..."></label><img id="bookCoverPreview" class="cover-preview hidden" alt="封面預覽"><label class="check-row"><input id="bookApproval" type="checkbox"> 此書需要管理員核准的會員才能閱讀</label><button class="btn btn-primary">新增書本</button></form></div><div class="panel"><div class="panel-heading"><h3>現有書本</h3></div><div id="adminBookList"></div></div></div></div>
         <div id="admin-announcements" class="admin-pane hidden"><div class="panel"><h3>發布首頁公告</h3><form id="announcementForm" class="form-stack"><label>公告標題<input id="announcementTitle" required></label><label>公告內容<textarea id="announcementBody" rows="3" required></textarea></label><button class="btn btn-primary">發布公告</button></form><div id="announcementAdminList"></div></div></div>
+
+        <div id="admin-branding" class="admin-pane hidden"><div class="admin-columns">
+          <div class="panel"><h3>網站 Logo</h3>
+            <form id="brandForm" class="form-stack">
+              <label>選擇 Logo 圖片（PNG／JPG／WebP／SVG，建議透明背景）<input id="brandFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></label>
+              <p class="form-hint">系統會自動縮小並產生「瀏覽器圖示」與「網站內顯示」兩種尺寸。選好圖片後，右邊會先預覽，按「儲存並套用」才會正式更換。</p>
+              <button id="brandSave" class="btn btn-primary" disabled>儲存並套用</button>
+              <button type="button" id="brandReset" class="btn btn-ghost">移除自訂 Logo（還原預設）</button>
+            </form>
+          </div>
+          <div class="panel"><h3>預覽與下載</h3>
+            <div class="brand-prev-row">
+              <div class="bp bp-light"><img id="pvLogoLight" class="hidden" alt=""><span id="pvNone">尚未上傳</span></div>
+              <div class="bp bp-dark"><img id="pvLogoDark" class="hidden" alt=""></div>
+              <div class="bp bp-tab"><img id="pvIcon" class="hidden" alt=""><span>Unfinished｜學習中心</span></div>
+            </div>
+            <p class="form-hint">Logo 會顯示在：瀏覽器分頁圖示與地址欄、手機加入主畫面的圖示、登入頁、側邊欄、首頁歡迎區與頁尾。</p>
+            <div class="edit-actions" style="flex-wrap:wrap">
+              <button type="button" id="dlFavicon" class="btn btn-ghost btn-small" disabled>下載 favicon.png</button>
+              <button type="button" id="dlOg" class="btn btn-ghost btn-small" disabled>下載分享縮圖 og-image.png</button>
+              <button type="button" id="dlLogo" class="btn btn-ghost btn-small" disabled>下載 logo.png</button>
+            </div>
+            <p class="form-hint"><b>分享縮圖說明：</b>LINE／Facebook 等的連結預覽，是由對方伺服器直接讀取網站原始碼，看不到後台上傳的圖片。若要讓連結預覽出現 Logo，請下載 og-image.png 放進網站根目錄（與 index.html 同一層），並把 index.html 裡的 og:image 改成完整網址。</p>
+          </div></div></div>
       </section>
-      <footer>Unfinished LEARNING HUB <span>LEARN · APPLY · SHARE</span></footer>
+      <footer><div class="foot-brand"><img id="footLogo" class="foot-logo hidden" alt="">UNFINISHED LEARNING HUB</div> <span>LEARN · APPLY · SHARE</span></footer>
     </main>
   </div>
 

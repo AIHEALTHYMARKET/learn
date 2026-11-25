@@ -127,6 +127,18 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ───────── 網站設定（品牌 Logo） ─────────
+    // Logo 要顯示在登入頁，所以未登入也要能讀；只有管理員能寫，且只能是兩張不太大的圖片字串。
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && settingId == "branding"
+        && request.resource.data.keys().hasOnly(["logo", "icon", "updatedAt"])
+        && request.resource.data.logo is string && request.resource.data.logo.size() < 700000
+        && request.resource.data.icon is string && request.resource.data.icon.size() < 700000;
+      allow delete: if isAdmin();
+    }
+
     // ───────── 公告 ─────────
     match /announcements/{announcementId} {
       allow read: if signedIn();

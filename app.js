@@ -26,7 +26,6 @@ let activeLesson = null, audioEl = null, ytPlayer = null, ytTimer = null, lastSa
 /* ───────────── 小工具 ───────────── */
 let toastTimer;
 const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200); };
-const dateText = () => new Intl.DateTimeFormat("zh-TW", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(new Date());
 const isAdminUser = u => !!u?.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 const isApproved = () => isAdmin || profile?.status === "approved"; // 舊制整體會員資格：目前只用在「需審核的書本」
 // 分類進入權限：營養課程與「需審核」的分類，要先提出申請，管理員核准後才能進入
@@ -35,6 +34,10 @@ const accessStatus = c => accessMap[c.id] || "";   // "" | "pending" | "approved
 const categoryAllowed = c => isAdmin || !needsApproval(c) || accessMap[c.id] === "approved";
 const progressFor = id => progressMap[id] || { percent: 0, completed: false, position: 0 };
 const catName = id => categories.find(c => c.id === id)?.name || "未分類";
+// 排序：有 order 的依 order 由小到大；沒有 order 的（舊資料或新增的）排在後面，依新增時間
+const sortKey = x => typeof x.order === "number" ? x.order : 1e12 + secs(x.createdAt);
+const byOrder = (x, y) => sortKey(x) - sortKey(y);
+const byCreated = (x, y) => secs(x.createdAt) - secs(y.createdAt);
 const nowStamp = () => ({ seconds: Math.floor(Date.now() / 1000) });
 const run = async (fn, okMsg) => {
   try { await fn(); if (okMsg) toast(okMsg); return true; }
@@ -97,7 +100,7 @@ async function loadAll() {
     await setDoc(doc(db, "users", uid), base);
     profile = { ...base, createdAt: nowStamp() };
   }
-  categories = c.docs.map(d => ({ id: d.id, ...d.data() }));
+  categories = c.docs.map(d => ({ id: d.id, ...d.data() })).sort(byOrder);
   // 管理員一次讀全部；其他人只查詢「有權進入的分類」，這樣才符合 Firestore Rules。
   let snaps;
   if (isAdmin) snaps = [await getDocs(query(collection(db, "lessons"), orderBy("createdAt", "asc")))];
@@ -106,7 +109,7 @@ async function loadAll() {
       .map(cat => getDocs(query(collection(db, "lessons"), where("categoryId", "==", cat.id))).catch(e => { console.warn("讀取分類課程失敗", cat.id, e.code); return null; }))
   );
   lessons = snaps.filter(Boolean).flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
-  lessons.sort((x, y) => secs(x.createdAt) - secs(y.createdAt)); // 非管理員查詢沒有排序，這裡統一依新增時間排序
+  lessons.sort(byOrder); // 依管理員設定的順序排列（未設定的依新增時間）
   // 書本：未核准會員只能查「不需審核」的書（才符合 Rules）。失敗（例如 Rules 尚未更新）不影響其他功能。
   try {
     const bs = isApproved()
@@ -123,7 +126,7 @@ function renderShell(reset) {
   $("loginScreen").classList.add("hidden"); $("appShell").classList.remove("hidden");
   $("userName").textContent = currentUser.displayName || "學習者"; $("userEmail").textContent = currentUser.email;
   $("userAvatar").textContent = (currentUser.displayName || "U").slice(0, 1).toUpperCase();
-  $("dateLabel").textContent = dateText().toUpperCase();
+  $("dateLabel").textContent = "Unfinished";
   $("adminNavWrap").classList.toggle("hidden", !isAdmin);
   const pendingN = categories.filter(c => accessMap[c.id] === "pending").length;
   $("approvalBanner").classList.toggle("hidden", !pendingN);
@@ -198,7 +201,7 @@ function renderHome() {
     .sort((a, b) => secs(progressFor(b.id).updatedAt) - secs(progressFor(a.id).updatedAt)).slice(0, 4);
   $("continueList").innerHTML = cont.length ? cont.map(l => `<div class="lesson-row"><div class="lesson-thumb">${l.type === "mp3" ? "♫" : "✧"}</div><div class="lesson-row-main"><b>${esc(l.title)}</b><small>${esc(catName(l.categoryId))}</small></div><div class="mini-progress"><small>${progressFor(l.id).percent || 0}%</small><div class="progress-track"><i style="width:${progressFor(l.id).percent || 0}%"></i></div></div><button class="mini-btn" data-open="${esc(l.id)}">繼續</button></div>`).join("") : "<div class='empty-state'>目前還沒有學習紀錄。</div>";
   $("newList").innerHTML = announcements.slice(0, 3).map(a => `<div class="new-row"><div class="lesson-thumb">✦</div><div class="lesson-row-main"><b>${esc(a.title)}</b><small>${esc(a.body)}</small></div></div>`).join("")
-    || lessons.slice(-3).reverse().map(l => `<div class="new-row"><div class="lesson-thumb">${l.type === "mp3" ? "♫" : "✧"}</div><div class="lesson-row-main"><b>${esc(l.title)}</b><small>${esc(catName(l.categoryId))}</small></div><span class="new-badge">NEW</span></div>`).join("")
+    || [...lessons].sort(byCreated).slice(-3).reverse().map(l => `<div class="new-row"><div class="lesson-thumb">${l.type === "mp3" ? "♫" : "✧"}</div><div class="lesson-row-main"><b>${esc(l.title)}</b><small>${esc(catName(l.categoryId))}</small></div><span class="new-badge">NEW</span></div>`).join("")
     || "<div class='empty-state'>目前沒有新課程。</div>";
   $("homeCategories").innerHTML = ["mp3", "nutrition"].map(type => categoryCardHtml(categories.filter(c => c.type === type), true)).join("") || "<div class='empty-state'>目前沒有可瀏覽的分類。</div>";
   bindCategoryCards();
@@ -523,17 +526,38 @@ $("lessonForm").onsubmit = async e => {
     form.reset(); applyLessonTypeUI(); await reload(false);
   }, "學習內容已新增");
 };
-const adminLessonRow = l => `<div class="admin-item" style="padding-left:25px"><div><b>${esc(l.title)}</b><small>${l.type === "mp3" ? "MP3" : "YouTube"}</small></div><div class="admin-actions"><button class="mini-btn" data-editlesson="${esc(l.id)}">編輯</button><button class="mini-btn danger" data-dellesson="${esc(l.id)}">刪除內容</button></div></div>`;
+const moveBtns = (kind, id, i, n) => `<button class="mini-btn" data-move="${kind}:${esc(id)}:-1" ${i === 0 ? "disabled" : ""} title="上移" aria-label="上移">↑</button><button class="mini-btn" data-move="${kind}:${esc(id)}:1" ${i === n - 1 ? "disabled" : ""} title="下移" aria-label="下移">↓</button>`;
+const adminLessonRow = (l, i, n) => `<div class="admin-item" style="padding-left:25px"><div><b>${esc(l.title)}</b><small>${l.type === "mp3" ? "MP3" : "YouTube"}</small></div><div class="admin-actions">${i == null ? "" : moveBtns("lesson", l.id, i, n)}<button class="mini-btn" data-editlesson="${esc(l.id)}">編輯</button><button class="mini-btn danger" data-dellesson="${esc(l.id)}">刪除內容</button></div></div>`;
+// 把同一專區的分類（或同一分類內的課程）依目前順序重新編號，交換位置後一次寫入
+async function moveItem(kind, id, dir) {
+  const item = (kind === "category" ? categories : lessons).find(x => x.id === id); if (!item) return;
+  const group = (kind === "category" ? categories.filter(c => c.type === item.type) : lessons.filter(l => l.categoryId === item.categoryId)).slice().sort(byOrder);
+  const i = group.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= group.length) return;
+  [group[i], group[j]] = [group[j], group[i]];
+  await run(async () => {
+    const batch = writeBatch(db);
+    group.forEach((x, idx) => { if (x.order !== idx) batch.update(doc(db, kind === "category" ? "categories" : "lessons", x.id), { order: idx }); });
+    await batch.commit();
+    await reload(false);
+  });
+}
 async function loadAdmin() {
   if (!isAdmin) return;
   refreshCategoryOptions();
+  renderBrandAdmin();
   const orphans = lessons.filter(l => !categories.some(c => c.id === l.categoryId));
-  $("adminContentList").innerHTML = categories.map(c => {
-    const ls = lessons.filter(l => l.categoryId === c.id), forced = c.type === "nutrition";
-    return `<div class="admin-item"><div><b>${esc(c.name)}</b><small>${c.type === "mp3" ? "MP3" : "營養課程"} · ${ls.length} 個單元 · ${forced || c.requiresApproval ? "需審核" : "開放"}</small></div><div class="admin-actions">${forced ? "" : `<button class="mini-btn" data-togglecat="${esc(c.id)}">${c.requiresApproval ? "改為開放" : "設為審核"}</button>`}<button class="mini-btn danger" data-delcat="${esc(c.id)}">刪除</button></div></div>${ls.map(adminLessonRow).join("")}`;
-  }).join("") + (orphans.length ? `<div class="admin-item"><div><b>未分類內容（分類已被刪除）</b><small>這些內容學員看不到，可在此刪除</small></div></div>${orphans.map(adminLessonRow).join("")}` : "")
+  const TYPE_LABEL = { mp3: "MP3 聆聽學習", nutrition: "營養課程" };
+  $("adminContentList").innerHTML = ["mp3", "nutrition"].map(type => {
+    const cats = categories.filter(c => c.type === type); if (!cats.length) return "";
+    return `<p class="eyebrow" style="margin:18px 0 6px">${TYPE_LABEL[type]}</p>` + cats.map((c, ci) => {
+      const ls = lessons.filter(l => l.categoryId === c.id), forced = c.type === "nutrition";
+      return `<div class="admin-item"><div><b>${esc(c.name)}</b><small>${TYPE_LABEL[type]} · ${ls.length} 個單元 · ${forced || c.requiresApproval ? "需審核" : "開放"}</small></div><div class="admin-actions">${moveBtns("category", c.id, ci, cats.length)}${forced ? "" : `<button class="mini-btn" data-togglecat="${esc(c.id)}">${c.requiresApproval ? "改為開放" : "設為審核"}</button>`}<button class="mini-btn danger" data-delcat="${esc(c.id)}">刪除</button></div></div>${ls.map((l, li) => adminLessonRow(l, li, ls.length)).join("")}`;
+    }).join("");
+  }).join("") + (orphans.length ? `<div class="admin-item"><div><b>未分類內容（分類已被刪除）</b><small>這些內容學員看不到，可在此刪除</small></div></div>${orphans.map(l => adminLessonRow(l)).join("")}` : "")
     || "<div class='empty-state'>尚未建立分類。</div>";
   const box = $("adminContentList");
+  box.querySelectorAll("[data-move]").forEach(b => b.onclick = () => { const [kind, id, dir] = b.dataset.move.split(":"); moveItem(kind, id, Number(dir)); });
   box.querySelectorAll("[data-togglecat]").forEach(b => b.onclick = () => run(async () => {
     const c = categories.find(x => x.id === b.dataset.togglecat);
     await updateDoc(doc(db, "categories", c.id), { requiresApproval: !c.requiresApproval }); await reload(false);
@@ -692,3 +716,98 @@ $("announcementForm").onsubmit = async e => {
   }, "公告已發布");
 };
 applyLessonTypeUI();
+
+/* ───────────── 品牌 Logo ───────────── */
+// Logo 存在 Firestore settings/branding（logo＝網站內顯示用、icon＝192px 圖示），任何人（含未登入）可讀，只有管理員可寫。
+const BRAND_KEY = "unfinished.branding.v1";
+const okImg = s => typeof s === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(s) && s.length < 700000;
+const DEFAULT_FAVICON = $("favicon")?.getAttribute("href") || "";
+let branding = null, pendingBrand = null;
+function applyBranding(b) {
+  branding = b && okImg(b.logo) && okImg(b.icon) ? { logo: b.logo, icon: b.icon } : null;
+  document.querySelectorAll("[data-logo]").forEach(el => {
+    if (branding) { el.classList.add("has-logo"); el.innerHTML = `<img src="${branding.logo}" alt="Unfinished">`; }
+    else { el.classList.remove("has-logo"); el.textContent = el.dataset.logo; }
+  });
+  const fl = $("footLogo"); if (fl) { if (branding) fl.src = branding.logo; fl.classList.toggle("hidden", !branding); }
+  const fav = $("favicon"); if (fav) { fav.setAttribute("href", branding ? branding.icon : DEFAULT_FAVICON); fav.setAttribute("type", branding ? "image/png" : "image/svg+xml"); }
+  let touch = document.querySelector("link[rel='apple-touch-icon']");
+  if (branding) { if (!touch) { touch = document.createElement("link"); touch.rel = "apple-touch-icon"; document.head.appendChild(touch); } touch.href = branding.icon; }
+  else touch?.remove();
+  if ($("admin-branding")) renderBrandAdmin();
+}
+function cacheBranding(b) { try { b ? localStorage.setItem(BRAND_KEY, JSON.stringify({ logo: b.logo, icon: b.icon })) : localStorage.removeItem(BRAND_KEY); } catch (_) { /* 忽略 */ } }
+async function loadBranding() {
+  if (!db) return;
+  try { const s = await getDoc(doc(db, "settings", "branding")); const b = s.exists() ? s.data() : null; applyBranding(b); cacheBranding(branding); }
+  catch (e) { console.warn("讀取 Logo 失敗（Firestore Rules 可能尚未更新）", e.code); }
+}
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("無法讀取這張圖片")); };
+    img.src = url;
+  });
+}
+// 產生兩個尺寸：logo（最長邊 ≤512，保留透明）與 icon（192×192 置中、留白）
+async function fileToBranding(file) {
+  if (file.size > 8 * 1024 * 1024) throw new Error("圖片太大，請選擇小於 8 MB 的檔案");
+  const img = await loadImage(file), w0 = img.naturalWidth || 512, h0 = img.naturalHeight || 512, isSvg = file.type === "image/svg+xml";
+  let logo = "";
+  for (const side of [512, 384, 256]) {
+    const s = isSvg ? side / Math.max(w0, h0) : Math.min(1, side / Math.max(w0, h0));
+    const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w0 * s)); c.height = Math.max(1, Math.round(h0 * s));
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    logo = c.toDataURL("image/png"); if (logo.length > 450000) logo = c.toDataURL("image/webp", 0.9);
+    if (logo.length <= 450000) break;
+  }
+  if (logo.length > 600000) throw new Error("圖片過於複雜，請換一張較簡單或較小的圖");
+  const ic = document.createElement("canvas"); ic.width = ic.height = 192;
+  const s2 = Math.min((192 - 28) / w0, (192 - 28) / h0), iw = w0 * s2, ih = h0 * s2;
+  ic.getContext("2d").drawImage(img, (192 - iw) / 2, (192 - ih) / 2, iw, ih);
+  return { logo, icon: ic.toDataURL("image/png") };
+}
+function saveDataUrl(href, name) { const a = document.createElement("a"); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+async function downloadOg() {
+  const src = (pendingBrand || branding)?.logo; if (!src) return;
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  const c = document.createElement("canvas"); c.width = 1200; c.height = 630; const g = c.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 1200, 630); bg.addColorStop(0, "#101827"); bg.addColorStop(1, "#1d2d47"); g.fillStyle = bg; g.fillRect(0, 0, 1200, 630);
+  const s = Math.min(560 / img.width, 300 / img.height), w = img.width * s, h = img.height * s;
+  g.drawImage(img, (1200 - w) / 2, 110 + (300 - h) / 2, w, h);
+  g.fillStyle = "#fff"; g.textAlign = "center"; g.font = "700 64px 'DM Sans','Noto Sans TC',sans-serif"; g.fillText("Unfinished", 600, 510);
+  g.fillStyle = "#c9a45e"; g.font = "500 26px 'DM Sans','Noto Sans TC',sans-serif"; g.fillText("LEARNING HUB", 600, 560);
+  c.toBlob(b => { const u = URL.createObjectURL(b); saveDataUrl(u, "og-image.png"); setTimeout(() => URL.revokeObjectURL(u), 3000); }, "image/png");
+}
+function renderBrandAdmin() {
+  const cur = pendingBrand || branding, show = (id, src) => { const el = $(id); if (!el) return; if (src) el.src = src; el.classList.toggle("hidden", !src); };
+  show("pvLogoLight", cur?.logo); show("pvLogoDark", cur?.logo); show("pvIcon", cur?.icon);
+  $("pvNone").classList.toggle("hidden", !!cur);
+  $("brandSave").disabled = !pendingBrand;
+  ["dlFavicon", "dlOg", "dlLogo"].forEach(id => $(id).disabled = !cur);
+}
+$("brandFile").addEventListener("change", async () => {
+  const f = $("brandFile").files[0]; pendingBrand = null;
+  if (f) { try { pendingBrand = await fileToBranding(f); } catch (e) { toast(e.message || "無法處理這張圖片"); $("brandFile").value = ""; } }
+  renderBrandAdmin();
+});
+$("brandForm").onsubmit = async e => {
+  e.preventDefault(); if (!pendingBrand) return;
+  const b = pendingBrand;
+  const ok = await run(async () => {
+    await setDoc(doc(db, "settings", "branding"), { logo: b.logo, icon: b.icon, updatedAt: serverTimestamp() });
+    pendingBrand = null; $("brandFile").value = ""; applyBranding(b); cacheBranding(b);
+  }, "Logo 已更新並套用到全站");
+  if (ok) renderBrandAdmin();
+};
+$("brandReset").onclick = async () => {
+  if (!branding && !pendingBrand) { toast("目前沒有自訂 Logo"); return; }
+  if (!confirm("移除自訂 Logo，還原成預設的「U」圖示？")) return;
+  await run(async () => { await deleteDoc(doc(db, "settings", "branding")); pendingBrand = null; $("brandFile").value = ""; applyBranding(null); cacheBranding(null); }, "已還原預設 Logo");
+};
+$("dlFavicon").onclick = () => { const c = pendingBrand || branding; if (c) saveDataUrl(c.icon, "favicon.png"); };
+$("dlLogo").onclick = () => { const c = pendingBrand || branding; if (c) saveDataUrl(c.logo, "logo.png"); };
+$("dlOg").onclick = () => downloadOg().catch(() => toast("產生縮圖失敗"));
+try { applyBranding(JSON.parse(localStorage.getItem(BRAND_KEY) || "null")); } catch (_) { /* 忽略 */ }
+loadBranding();
