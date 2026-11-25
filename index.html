@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827"><meta name="referrer" content="strict-origin-when-cross-origin"><title>BS GLOBAL｜學習中心</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c9a45e%27/%3E%3Ctext x=%2732%27 y=%2742%27 font-size=%2728%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%23172235%27 font-family=%27sans-serif%27%3EBS%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <noscript><p style="padding:24px;font-family:sans-serif">此網站需要啟用 JavaScript 才能使用。</p></noscript>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="brand-mark">BS<span>+</span></div>
+      <p class="eyebrow">BS GLOBAL LEARNING HUB</p>
+      <h1>把學習，變成持續前進的力量。</h1>
+      <p class="muted">登入後即可查看開放課程、學習紀錄與個人筆記。部分專區須經管理員審核。</p>
+      <button id="loginBtn" class="btn btn-primary btn-wide">使用 Google 帳號登入</button>
+      <p id="loginError" class="error-text"></p>
+      <div class="login-foot">SECURE MEMBER LEARNING SPACE</div>
+    </div>
+  </div>
+
+  <div id="appShell" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="side-brand"><div class="brand-mark small">BS<span>+</span></div><div><b>BS GLOBAL</b><small>LEARNING HUB</small></div></div>
+      <div class="side-label">學習空間</div>
+      <button class="nav-item active" data-view="home"><span>▦</span> 學習總覽</button>
+      <button class="nav-item" data-view="mp3"><span>♫</span> MP3 聆聽學習</button>
+      <button class="nav-item" data-view="nutrition"><span>✧</span> 營養課程</button>
+      <div class="side-label">個人</div>
+      <button class="nav-item" data-view="notes"><span>▤</span> 我的筆記</button>
+      <div id="adminNavWrap" class="hidden"><div class="side-label">管理</div><button class="nav-item" data-view="admin"><span>⚙</span> 管理員後台</button></div>
+      <div class="sidebar-bottom"><div class="secure-pill">● 安全登入</div><div class="user-mini"><div id="userAvatar" class="avatar">U</div><div class="user-mini-text"><b id="userName">使用者</b><small id="userEmail"></small></div><button id="logoutBtn" title="登出">↗</button></div></div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar"><div><p class="eyebrow" id="dateLabel">YOUR LEARNING SPACE</p><h2 id="pageTitle">學習總覽</h2></div><div class="top-actions"><span class="online-dot">● 已登入</span><button id="refreshBtn" class="icon-btn" title="重新整理">↻</button><button id="logoutTop" class="icon-btn logout-top" title="登出">登出</button></div></header>
+      <section id="approvalBanner" class="notice hidden"></section>
+      <section id="view-home" class="view">
+        <div class="welcome-row"><div><p class="eyebrow">WELCOME BACK</p><h1>今天，向前學一點。</h1><p class="muted">每一次聆聽與理解，都會累積成下一次分享的底氣。</p></div><div class="welcome-orb">✦</div></div>
+        <div class="stats-grid">
+          <article class="stat-card stat-feature"><div class="stat-top"><span>整體學習進度</span><span class="stat-icon">◉</span></div><div class="stat-number" id="overallPercent">0%</div><div class="progress-track"><i id="overallBar"></i></div><small id="overallText">尚未開始學習</small></article>
+          <article class="stat-card"><div class="stat-top"><span>已完成內容</span><span class="stat-icon">✓</span></div><div class="stat-number" id="completedCount">0</div><small>完成的音檔與課程</small></article>
+          <article class="stat-card"><div class="stat-top"><span>進行中</span><span class="stat-icon">◷</span></div><div class="stat-number" id="inProgressCount">0</div><small>尚待完成的學習內容</small></article>
+          <article class="stat-card"><div class="stat-top"><span>我的筆記</span><span class="stat-icon">▤</span></div><div class="stat-number" id="notesCount">0</div><small>已保存的學習重點</small></article>
+        </div>
+        <div class="home-columns">
+          <section class="panel"><div class="panel-heading"><div><p class="eyebrow">CONTINUE LEARNING</p><h3>繼續上次的學習</h3></div><button class="text-btn" data-goto="mp3">查看全部 →</button></div><div id="continueList" class="lesson-list empty-state">目前還沒有學習紀錄。</div></section>
+          <section class="panel"><div class="panel-heading"><div><p class="eyebrow">WHAT'S NEW</p><h3>最新課程提醒</h3></div><span class="new-badge">NEW</span></div><div id="newList" class="new-list empty-state">目前沒有新課程。</div></section>
+        </div>
+        <section class="panel category-overview"><div class="panel-heading"><div><p class="eyebrow">YOUR LIBRARY</p><h3>學習專區</h3></div></div><div id="homeCategories" class="category-grid"></div></section>
+        <div class="tip-strip"><span>✦</span><div><b>學習小提醒</b><p>聽完或看完一個單元後，花 30 秒寫下「三個重點、一個可分享的例子」，讓知識更容易被記住。</p></div></div>
+      </section>
+      <section id="view-mp3" class="view hidden"><div class="section-intro"><p class="eyebrow">AUDIO LIBRARY</p><h1>MP3 聆聽學習</h1><p class="muted">依照主題分類，隨時聆聽、記錄並延續你的學習進度。</p></div><div id="mp3Categories" class="category-grid"></div><div id="mp3Lessons" class="hidden"></div></section>
+      <section id="view-nutrition" class="view hidden"><div class="section-intro"><p class="eyebrow">NUTRITION ACADEMY</p><h1>營養課程</h1><p class="muted">系統化建立營養知識，讓每一次分享都有根據。</p></div><div id="nutritionCategories" class="category-grid"></div><div id="nutritionLessons" class="hidden"></div></section>
+      <section id="view-notes" class="view hidden"><div class="section-intro"><p class="eyebrow">MY KNOWLEDGE</p><h1>我的筆記</h1><p class="muted">集中回顧每一段學習留下的重點。</p></div><div id="allNotes" class="notes-grid"></div></section>
+      <section id="view-admin" class="view hidden"><div class="section-intro"><p class="eyebrow">CONTROL CENTER</p><h1>管理員後台</h1><p class="muted">管理分類、課程內容、審核會員與發布公告。</p></div>
+        <div class="admin-tabs"><button class="tab active" data-admin-tab="content">課程管理</button><button class="tab" data-admin-tab="members">會員審核</button><button class="tab" data-admin-tab="announcements">公告管理</button></div>
+        <div id="admin-content" class="admin-pane">
+          <div class="admin-columns"><div class="panel"><h3>新增分類</h3><form id="categoryForm" class="form-stack"><label>所屬專區<select id="categoryType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>分類名稱<input id="categoryName" required placeholder="例如：新人必修"></label><label>簡介<input id="categoryDesc" placeholder="簡短描述"></label><label class="check-row"><input id="categoryApproval" type="checkbox"> 此分類需要管理員審核</label><button class="btn btn-primary">新增分類</button></form></div>
+          <div class="panel"><h3>新增學習內容</h3><form id="lessonForm" class="form-stack"><label>所屬專區<select id="lessonType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>選擇分類<select id="lessonCategory" required></select></label><label>內容標題<input id="lessonTitle" required placeholder="輸入課程名稱"></label><label>內容說明<textarea id="lessonDesc" rows="2" placeholder="學習重點或簡介"></textarea></label><label id="mediaLabel"><span id="mediaLabelText">MP3 來源</span><input id="lessonMedia" required placeholder="貼上 Drive 連結或 audio/檔名.mp3"></label><p class="form-hint" id="mediaHint">請先將 MP3 設定為「知道連結的任何人可檢視」，再貼上檔案 ID。</p><button class="btn btn-primary">新增學習內容</button></form></div></div>
+          <div class="panel"><div class="panel-heading"><h3>現有課程內容</h3><button id="reloadAdminContent" class="text-btn">重新整理</button></div><div id="adminContentList"></div></div>
+        </div>
+        <div id="admin-members" class="admin-pane hidden"><div class="panel"><div class="panel-heading"><h3>待審核會員</h3><span class="new-badge" id="pendingCount">0 待處理</span></div><div id="pendingMembers"></div></div><div class="panel"><h3>已核准會員</h3><div id="approvedMembers"></div></div></div>
+        <div id="admin-announcements" class="admin-pane hidden"><div class="panel"><h3>發布首頁公告</h3><form id="announcementForm" class="form-stack"><label>公告標題<input id="announcementTitle" required></label><label>公告內容<textarea id="announcementBody" rows="3" required></textarea></label><button class="btn btn-primary">發布公告</button></form><div id="announcementAdminList"></div></div></div>
+      </section>
+      <footer>BS GLOBAL LEARNING HUB <span>LEARN · APPLY · SHARE</span></footer>
+    </main>
+  </div>
+
+  <div id="lessonModal" class="modal hidden"><div class="modal-backdrop" data-close></div><div class="modal-card"><button class="modal-close" data-close>×</button><div id="modalContent"></div></div></div>
+  <div id="toast" class="toast"></div>
+  <script async src="https://www.youtube.com/iframe_api"></script>
+  <script type="module" src="app.js"></script>
+</body></html>

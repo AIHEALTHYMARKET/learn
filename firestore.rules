@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ───────── 身分判斷 ─────────
+    function signedIn() { return request.auth != null; }
+
+    // 管理員 = 這個 Gmail 且 Google 已驗證。若要更換管理員，只需改這一行的 Email，
+    // 並同步修改 app.js 最上方的 ADMIN_EMAIL。
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == "diabolo.weien@gmail.com";
+    }
+
+    // 已被管理員核准的會員（users/{uid}.status == "approved"）
+    function isApprovedMember() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "approved";
+    }
+    function approved() { return isAdmin() || isApprovedMember(); }
+
+    // 這個分類目前的使用者能不能讀？
+    //   公開分類（requiresApproval 不是 true，且 type 不是 nutrition）→ 所有登入者
+    //   審核分類 / 營養課程                                      → 管理員或已核准會員
+    function canReadCategory(categoryId) {
+      return exists(/databases/$(database)/documents/categories/$(categoryId))
+        && (
+          (get(/databases/$(database)/documents/categories/$(categoryId)).data.get('requiresApproval', false) != true
+            && get(/databases/$(database)/documents/categories/$(categoryId)).data.type != "nutrition")
+          || approved()
+        );
+    }
+
+    // ───────── 會員資料 ─────────
+    match /users/{uid} {
+      // 自己能讀自己；管理員能讀全部（會員審核頁需要）
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      // 首次登入只能建立「待審核」且 Email 必須與登入帳號一致；不能自己寫 approved
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["email", "name", "photoURL", "status", "createdAt", "lastSeen"])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == "pending";
+
+      // 管理員可核准／撤銷；一般會員只能改自己的顯示資料，不能動 status
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name", "photoURL", "lastSeen"]));
+
+      allow delete: if isAdmin();
+
+      // 學習進度：只有本人能讀寫
+      match /progress/{lessonId} {
+        // 讀取只需要是本人（不能在 read 規則裡用 {lessonId} 去查別的文件，否則整批列表查詢會被拒絕）
+        allow read: if signedIn() && request.auth.uid == uid;
+
+        // 寫入時才檢查：該課程存在、且本人有權限讀取該課程所屬分類
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(["percent", "completed", "position", "started", "updatedAt"])
+          && exists(/databases/$(database)/documents/lessons/$(lessonId))
+          && canReadCategory(get(/databases/$(database)/documents/lessons/$(lessonId)).data.categoryId);
+
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      // 個人筆記：只有本人能讀寫；內容必須是文字且不超過 20000 字元
+      match /notes/{noteId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(["lessonId", "title", "categoryName", "content", "createdAt", "updatedAt"])
+          && request.resource.data.content is string
+          && request.resource.data.content.size() <= 20000;
+      }
+    }
+
+    // ───────── 分類 ─────────
+    match /categories/{categoryId} {
+      // 登入者可看到分類名稱與簡介；真正的課程內容由 lessons 規則把關
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ───────── 課程內容 ─────────
+    match /lessons/{lessonId} {
+      // 管理員放在最前面：管理員後台要一次列出全部課程（含沒有分類的孤兒課程），
+      // 若沒有這一行，整批列表查詢會因為規則無法預先證明而被拒絕。
+      allow read: if isAdmin()
+        || (signedIn() && canReadCategory(resource.data.categoryId));
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ───────── 公告 ─────────
+    match /announcements/{announcementId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
