@@ -91,6 +91,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ───────── 書本（閱讀分頁） ─────────
+    match /books/{bookId} {
+      // 管理員、已核准會員可讀全部；其他登入者只能讀「不需審核」的書
+      // （前端對未核准會員會加上 where("requiresApproval","==",false) 查詢）
+      allow read: if isAdmin()
+        || (signedIn() && (approved() || resource.data.get('requiresApproval', false) != true));
+      allow create, update, delete: if isAdmin();
+    }
+
     // ───────── 公告 ─────────
     match /announcements/{announcementId} {
       allow read: if signedIn();

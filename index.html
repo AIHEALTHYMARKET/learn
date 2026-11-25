@@ -26,12 +26,13 @@
     <aside class="sidebar">
       <div class="side-brand"><div class="brand-mark small">BS<span>+</span></div><div><b>BS GLOBAL</b><small>LEARNING HUB</small></div></div>
       <div class="side-label">學習空間</div>
-      <button class="nav-item active" data-view="home"><span>▦</span> 學習總覽</button>
-      <button class="nav-item" data-view="mp3"><span>♫</span> MP3 聆聽學習</button>
-      <button class="nav-item" data-view="nutrition"><span>✧</span> 營養課程</button>
+      <button class="nav-item active" data-view="home"><span>▦</span><i class="lf">學習總覽</i><i class="ls">總覽</i></button>
+      <button class="nav-item" data-view="mp3"><span>♫</span><i class="lf">MP3 聆聽學習</i><i class="ls">MP3</i></button>
+      <button class="nav-item" data-view="nutrition"><span>✧</span><i class="lf">營養課程</i><i class="ls">營養</i></button>
+      <button class="nav-item" data-view="reading"><span>◫</span><i class="lf">閱讀</i><i class="ls">閱讀</i></button>
       <div class="side-label">個人</div>
-      <button class="nav-item" data-view="notes"><span>▤</span> 我的筆記</button>
-      <div id="adminNavWrap" class="hidden"><div class="side-label">管理</div><button class="nav-item" data-view="admin"><span>⚙</span> 管理員後台</button></div>
+      <button class="nav-item" data-view="notes"><span>▤</span><i class="lf">我的筆記</i><i class="ls">筆記</i></button>
+      <div id="adminNavWrap" class="hidden"><div class="side-label">管理</div><button class="nav-item" data-view="admin"><span>⚙</span><i class="lf">管理員後台</i><i class="ls">後台</i></button></div>
       <div class="sidebar-bottom"><div class="secure-pill">● 安全登入</div><div class="user-mini"><div id="userAvatar" class="avatar">U</div><div class="user-mini-text"><b id="userName">使用者</b><small id="userEmail"></small></div><button id="logoutBtn" title="登出">↗</button></div></div>
     </aside>
 
@@ -55,15 +56,17 @@
       </section>
       <section id="view-mp3" class="view hidden"><div class="section-intro"><p class="eyebrow">AUDIO LIBRARY</p><h1>MP3 聆聽學習</h1><p class="muted">依照主題分類，隨時聆聽、記錄並延續你的學習進度。</p></div><div id="mp3Categories" class="category-grid"></div><div id="mp3Lessons" class="hidden"></div></section>
       <section id="view-nutrition" class="view hidden"><div class="section-intro"><p class="eyebrow">NUTRITION ACADEMY</p><h1>營養課程</h1><p class="muted">系統化建立營養知識，讓每一次分享都有根據。</p></div><div id="nutritionCategories" class="category-grid"></div><div id="nutritionLessons" class="hidden"></div></section>
+      <section id="view-reading" class="view hidden"><div class="section-intro"><p class="eyebrow">READING ROOM</p><h1>閱讀</h1><p class="muted">在網站內直接閱讀電子書。</p></div><div id="bookGrid" class="book-grid"></div></section>
       <section id="view-notes" class="view hidden"><div class="section-intro"><p class="eyebrow">MY KNOWLEDGE</p><h1>我的筆記</h1><p class="muted">集中回顧每一段學習留下的重點。</p></div><div id="allNotes" class="notes-grid"></div></section>
       <section id="view-admin" class="view hidden"><div class="section-intro"><p class="eyebrow">CONTROL CENTER</p><h1>管理員後台</h1><p class="muted">管理分類、課程內容、審核會員與發布公告。</p></div>
-        <div class="admin-tabs"><button class="tab active" data-admin-tab="content">課程管理</button><button class="tab" data-admin-tab="members">會員審核</button><button class="tab" data-admin-tab="announcements">公告管理</button></div>
+        <div class="admin-tabs"><button class="tab active" data-admin-tab="content">課程管理</button><button class="tab" data-admin-tab="members">會員審核</button><button class="tab" data-admin-tab="books">書本管理</button><button class="tab" data-admin-tab="announcements">公告管理</button></div>
         <div id="admin-content" class="admin-pane">
           <div class="admin-columns"><div class="panel"><h3>新增分類</h3><form id="categoryForm" class="form-stack"><label>所屬專區<select id="categoryType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>分類名稱<input id="categoryName" required placeholder="例如：新人必修"></label><label>簡介<input id="categoryDesc" placeholder="簡短描述"></label><label class="check-row"><input id="categoryApproval" type="checkbox"> 此分類需要管理員審核</label><button class="btn btn-primary">新增分類</button></form></div>
           <div class="panel"><h3>新增學習內容</h3><form id="lessonForm" class="form-stack"><label>所屬專區<select id="lessonType"><option value="mp3">MP3 聆聽學習</option><option value="nutrition">營養課程</option></select></label><label>選擇分類<select id="lessonCategory" required></select></label><label>內容標題<input id="lessonTitle" required placeholder="輸入課程名稱"></label><label>內容說明<textarea id="lessonDesc" rows="2" placeholder="學習重點或簡介"></textarea></label><label id="mediaLabel"><span id="mediaLabelText">MP3 來源</span><input id="lessonMedia" required placeholder="貼上 Drive 連結或 audio/檔名.mp3"></label><p class="form-hint" id="mediaHint">請先將 MP3 設定為「知道連結的任何人可檢視」，再貼上檔案 ID。</p><button class="btn btn-primary">新增學習內容</button></form></div></div>
           <div class="panel"><div class="panel-heading"><h3>現有課程內容</h3><button id="reloadAdminContent" class="text-btn">重新整理</button></div><div id="adminContentList"></div></div>
         </div>
         <div id="admin-members" class="admin-pane hidden"><div class="panel"><div class="panel-heading"><h3>待審核會員</h3><span class="new-badge" id="pendingCount">0 待處理</span></div><div id="pendingMembers"></div></div><div class="panel"><h3>已核准會員</h3><div id="approvedMembers"></div></div></div>
+        <div id="admin-books" class="admin-pane hidden"><div class="admin-columns"><div class="panel"><h3>新增書本</h3><form id="bookForm" class="form-stack"><label>書名<input id="bookTitle" required placeholder="輸入書名"></label><label>簡介<input id="bookDesc" placeholder="選填"></label><label>FlipHTML5 連結（也可貼嵌入碼）<input id="bookLink" required placeholder="https://online.fliphtml5.com/xxxx/yyyy/"></label><label>封面縮圖（選擇圖片，會自動縮小）<input id="bookCoverFile" type="file" accept="image/*"></label><label>或貼封面圖片網址（https，選填）<input id="bookCoverUrl" placeholder="https://..."></label><img id="bookCoverPreview" class="cover-preview hidden" alt="封面預覽"><label class="check-row"><input id="bookApproval" type="checkbox"> 此書需要管理員核准的會員才能閱讀</label><button class="btn btn-primary">新增書本</button></form></div><div class="panel"><div class="panel-heading"><h3>現有書本</h3></div><div id="adminBookList"></div></div></div></div>
         <div id="admin-announcements" class="admin-pane hidden"><div class="panel"><h3>發布首頁公告</h3><form id="announcementForm" class="form-stack"><label>公告標題<input id="announcementTitle" required></label><label>公告內容<textarea id="announcementBody" rows="3" required></textarea></label><button class="btn btn-primary">發布公告</button></form><div id="announcementAdminList"></div></div></div>
       </section>
       <footer>BS GLOBAL LEARNING HUB <span>LEARN · APPLY · SHARE</span></footer>
@@ -71,6 +74,7 @@
   </div>
 
   <div id="lessonModal" class="modal hidden"><div class="modal-backdrop" data-close></div><div class="modal-card"><button class="modal-close" data-close>×</button><div id="modalContent"></div></div></div>
+  <div id="readerModal" class="reader hidden"><div class="reader-bar"><button class="back-btn" id="readerClose">← 返回書櫃</button><b id="readerTitle"></b></div><div id="readerBody" class="reader-body"></div></div>
   <div id="toast" class="toast"></div>
   <script async src="https://www.youtube.com/iframe_api"></script>
   <script type="module" src="app.js"></script>

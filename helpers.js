@@ -83,3 +83,21 @@ export function audioSrc(mediaId) {
   if (AUDIO_EXT.test(v) && !DRIVE_ID.test(v)) return v.includes("%") ? v : encodeURI(v);
   return driveSources(v)[0];
 }
+
+// FlipHTML5 電子書連結（也接受直接貼 <iframe ... src="..."> 嵌入碼）→ 乾淨的 https 網址；無法辨識回傳 null
+export function parseFlip(value) {
+  let v = String(value ?? "").trim();
+  if (!v) return null;
+  const m = v.match(/src\s*=\s*["']([^"']+)["']/i);
+  if (m) v = m[1].trim();
+  if (v.startsWith("//")) v = "https:" + v;
+  let u;
+  try { u = new URL(v); } catch (_) { return null; }
+  const host = u.hostname.toLowerCase();
+  if (host !== "fliphtml5.com" && !host.endsWith(".fliphtml5.com")) return null;
+  if (u.protocol === "http:") u.protocol = "https:";
+  return u.protocol === "https:" ? u.href : null;
+}
+
+// 封面圖片網址只接受 https 或 data:image
+export const safeCover = c => (/^(https:\/\/|data:image\/)/i.test(String(c ?? "")) ? String(c) : "");

@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, getDocs, query, where, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
-import { esc, secs, fmtTime, parseYoutube, parseMp3Source, audioSrc, driveIdOf, driveSources } from "./helpers.js";
+import { esc, secs, fmtTime, parseYoutube, parseMp3Source, audioSrc, driveIdOf, driveSources, parseFlip, safeCover } from "./helpers.js";
 
 /* ───────────── 設定 ───────────── */
 // 管理員 Gmail。必須與 firestore.rules 裡的 isAdmin() Email 完全相同。
@@ -19,7 +19,7 @@ if (!configMissing) { const app = initializeApp(firebaseConfig); auth = getAuth(
 
 /* ───────────── 狀態 ───────────── */
 let currentUser = null, isAdmin = false, profile = null;
-let categories = [], lessons = [], progressMap = {}, notes = [], announcements = [];
+let categories = [], lessons = [], progressMap = {}, notes = [], announcements = [], books = [];
 let currentCategory = null, currentView = "home";
 let activeLesson = null, audioEl = null, ytPlayer = null, ytTimer = null, lastSaveAt = 0, lastSavedPos = -1;
 
@@ -101,6 +101,13 @@ async function loadAll() {
   );
   lessons = snaps.filter(Boolean).flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
   lessons.sort((x, y) => secs(x.createdAt) - secs(y.createdAt)); // 非管理員查詢沒有排序，這裡統一依新增時間排序
+  // 書本：未核准會員只能查「不需審核」的書（才符合 Rules）。失敗（例如 Rules 尚未更新）不影響其他功能。
+  try {
+    const bs = isApproved()
+      ? await getDocs(query(collection(db, "books"), orderBy("createdAt", "asc")))
+      : await getDocs(query(collection(db, "books"), where("requiresApproval", "==", false)));
+    books = bs.docs.map(d => ({ id: d.id, ...d.data() })).sort((x, y) => secs(x.createdAt) - secs(y.createdAt));
+  } catch (e) { console.warn("讀取書本失敗（Firestore Rules 可能尚未更新）", e.code); books = []; }
   progressMap = {}; pr.forEach(d => progressMap[d.id] = d.data());
   notes = n.docs.map(d => ({ id: d.id, ...d.data() }));
   announcements = a.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -122,7 +129,7 @@ function renderShell(reset) {
 // 讀取資料並重畫目前畫面（管理員新增／刪除後不會被踢回首頁）
 async function reload(reset = false) { await loadAll(); renderShell(reset); }
 
-const VIEW_TITLES = { home: "學習總覽", mp3: "MP3 聆聽學習", nutrition: "營養課程", notes: "我的筆記", admin: "管理員後台" };
+const VIEW_TITLES = { home: "學習總覽", mp3: "MP3 聆聽學習", nutrition: "營養課程", reading: "閱讀", notes: "我的筆記", admin: "管理員後台" };
 function setView(name, keep = false) {
   if (name === "admin" && !isAdmin) name = "home";
   currentView = name;
@@ -136,6 +143,7 @@ function setView(name, keep = false) {
     const stillOpen = keep && currentCategory && !box.classList.contains("hidden") && categories.some(c => c.id === currentCategory.id);
     if (stillOpen) openCategory(currentCategory.id); else renderCategories(name);
   }
+  else if (name === "reading") renderBooks();
   else if (name === "notes") renderNotes();
   else if (name === "admin") loadAdmin();
   if (!keep) window.scrollTo({ top: 0 });
@@ -151,8 +159,8 @@ function loadErrorText(e) {
   return "已登入，但讀取資料失敗：" + (e?.code || e?.message || "未知錯誤");
 }
 function resetState() {
-  closeModal(true);
-  currentUser = null; isAdmin = false; profile = null; categories = []; lessons = []; progressMap = {}; notes = []; announcements = []; currentCategory = null; currentView = "home";
+  closeModal(true); closeReader();
+  currentUser = null; isAdmin = false; profile = null; categories = []; lessons = []; progressMap = {}; notes = []; announcements = []; books = []; currentCategory = null; currentView = "home";
   $("appShell").classList.add("hidden"); $("loginScreen").classList.remove("hidden");
 }
 if (auth) onAuthStateChanged(auth, async user => {
@@ -228,12 +236,14 @@ function openLesson(id) {
   if (activeLesson) closeModal(true);
   activeLesson = l; lastSaveAt = Date.now(); lastSavedPos = -1;
   const p = progressFor(id), isMp3 = l.type === "mp3";
-  $("modalContent").innerHTML = `<p class="eyebrow">${isMp3 ? "AUDIO LEARNING" : "NUTRITION COURSE"} · ${esc(c.name)}</p><h2>${esc(l.title)}</h2><p class="muted" style="font-size:12px">${esc(l.description || "")}</p><div class="media-frame ${isMp3 ? "audio" : ""}" id="mediaFrame">${isMp3 ? `<audio id="audioPlayer" controls preload="metadata" playsinline src="${esc(audioSrc(l.mediaId))}"></audio>` : `<div id="youtubePlayer"></div>`}</div><p id="mediaError" class="error-text hidden"></p><div class="panel-heading"><div><b style="font-size:12px">本單元進度</b><div class="progress-track lesson-progress-track"><i id="lessonProgressBar" style="width:${p.completed ? 100 : (p.percent || 0)}%"></i></div></div><span id="lessonProgressText" class="status-pill ${p.completed ? "done" : ""}">${p.completed ? "✓ 已完成" : (p.percent || 0) + "%"}</span></div><div class="note-editor"><label>我的學習筆記<textarea id="lessonNote" rows="5" maxlength="20000" placeholder="記錄重點、案例、未來分享時可以使用的說法..."></textarea></label><div class="note-actions"><small class="muted">筆記只會儲存在你的帳號內。</small><button id="saveNote" class="btn btn-primary btn-small">儲存筆記</button></div></div>`;
+  $("modalContent").innerHTML = `<p class="eyebrow">${isMp3 ? "AUDIO LEARNING" : "NUTRITION COURSE"} · ${esc(c.name)}</p><h2>${esc(l.title)}</h2><p class="muted" style="font-size:12px">${esc(l.description || "")}</p><div class="media-frame ${isMp3 ? "audio" : "yt"}" id="mediaFrame">${isMp3 ? `<audio id="audioPlayer" controls preload="metadata" playsinline src="${esc(audioSrc(l.mediaId))}"></audio>` : ytBoxHtml()}</div><p id="mediaError" class="error-text hidden"></p><div class="panel-heading"><div><b style="font-size:12px">本單元進度</b><div class="progress-track lesson-progress-track"><i id="lessonProgressBar" style="width:${p.completed ? 100 : (p.percent || 0)}%"></i></div></div><span id="lessonProgressText" class="status-pill ${p.completed ? "done" : ""}">${p.completed ? "✓ 已完成" : (p.percent || 0) + "%"}</span></div><div class="note-editor"><label>我的學習筆記<textarea id="lessonNote" rows="5" maxlength="20000" placeholder="記錄重點、案例、未來分享時可以使用的說法..."></textarea></label><div class="note-actions"><small class="muted">筆記只會儲存在你的帳號內。</small><button id="saveNote" class="btn btn-primary btn-small">儲存筆記</button></div></div>`;
   $("lessonModal").classList.remove("hidden"); document.body.classList.add("modal-open");
   $("lessonNote").value = notes.find(n => n.lessonId === id)?.content || "";
   $("saveNote").onclick = () => saveNote(id);
   if (isMp3) setupAudio(p); else setupYoutube(l, p);
 }
+// 自製 YouTube 播放介面：隱藏 YouTube 標題列／標誌，並用透明遮罩擋住點擊與右鍵
+const ytBoxHtml = () => `<div class="yt-box" id="ytBox"><div class="yt-stage"><div id="youtubePlayer"></div><div class="yt-shield idle" id="ytShield"><span class="yt-bigplay">▶</span></div></div><div class="yt-controls"><button type="button" id="ytPlay" class="yt-btn" aria-label="播放／暫停">▶</button><span id="ytTime" class="yt-time">0:00 / 0:00</span><input id="ytSeek" class="yt-seek" type="range" min="0" max="1000" value="0" aria-label="播放位置"><select id="ytRate" class="yt-rate" aria-label="播放速度"><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select><button type="button" id="ytFull" class="yt-btn" aria-label="全螢幕">⛶</button></div></div>`;
 function showMediaError(msg) { const e = $("mediaError"); if (e) { e.textContent = msg; e.classList.remove("hidden"); } toast(msg); }
 
 // 目前播放位置與總長度（MP3 或 YouTube）
@@ -330,30 +340,64 @@ function setupYoutube(l, p) {
   const videoId = parseYoutube(l.mediaId);
   if (!videoId) { showMediaError("這個課程的 YouTube 連結無法辨識，請管理員重新新增。"); return; }
   const start = !p.completed && p.position > 3 ? Math.floor(p.position) : 0;
-  let tries = 0;
+  const box = $("ytBox"), shield = $("ytShield"), playBtn = $("ytPlay"), seek = $("ytSeek"), timeEl = $("ytTime"), rate = $("ytRate"), full = $("ytFull");
+  let state = -1, tries = 0, dragging = false, everPlayed = false;
   const stopTicker = () => { if (ytTimer) { clearInterval(ytTimer); ytTimer = null; } };
+  const setShield = cls => { shield.className = "yt-shield " + cls; };
+  const paintTime = () => {
+    const m = currentMedia(); if (!m || !isFinite(m.dur) || m.dur <= 0) return;
+    if (!dragging) seek.value = Math.round(m.pos / m.dur * 1000);
+    timeEl.textContent = fmtTime(m.pos) + " / " + fmtTime(m.dur);
+  };
+  const tick = () => { paintTime(); snapshotProgress(false); };
+  const toggle = () => {
+    if (!ytPlayer || typeof ytPlayer.getPlayerState !== "function") return;
+    const s = ytPlayer.getPlayerState();
+    if (s === 1) { ytPlayer.pauseVideo(); return; }
+    if (s === 0) ytPlayer.seekTo(0, true);
+    ytPlayer.playVideo();
+    // 少數手機瀏覽器不允許由外層按鈕啟動：2.5 秒沒開始播就暫時讓使用者直接點影片本身
+    if (!everPlayed) setTimeout(() => { if (activeLesson?.id === l.id && !everPlayed) { shield.classList.add("passthrough"); toast("請直接點影片中央的播放鍵開始播放"); } }, 2500);
+  };
+  shield.addEventListener("click", toggle);
+  playBtn.addEventListener("click", toggle);
+  box.addEventListener("contextmenu", e => e.preventDefault());
+  seek.addEventListener("input", () => { dragging = true; const m = currentMedia(); if (m && m.dur > 0) timeEl.textContent = fmtTime(m.dur * seek.value / 1000) + " / " + fmtTime(m.dur); });
+  seek.addEventListener("change", () => {
+    const m = currentMedia(); dragging = false;
+    if (m && m.dur > 0) { ytPlayer.seekTo(m.dur * seek.value / 1000, true); setTimeout(() => snapshotProgress(true), 700); }
+  });
+  rate.addEventListener("change", () => { try { ytPlayer.setPlaybackRate(parseFloat(rate.value)); } catch (_) { /* 忽略 */ } });
+  if (!(box.requestFullscreen || box.webkitRequestFullscreen)) full.style.display = "none"; // iPhone Safari 不支援網頁元素全螢幕
+  full.addEventListener("click", () => {
+    if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else (box.requestFullscreen || box.webkitRequestFullscreen).call(box);
+  });
   const wait = () => {
     if (!activeLesson || activeLesson.id !== l.id) return; // 視窗已關閉
     if (window.YT && window.YT.Player) {
       ytPlayer = new YT.Player("youtubePlayer", {
         videoId,
-        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, iv_load_policy: 3, start, origin: location.origin },
+        playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, start, origin: location.origin },
         events: {
+          onReady: () => paintTime(),
           onStateChange: e => {
-            if (e.data === 1) { stopTicker(); ytTimer = setInterval(() => snapshotProgress(false), 1000); } // 播放中：每秒更新畫面，節流寫入
-            else if (e.data === 2) { stopTicker(); snapshotProgress(true); }                                  // 暫停：立即存
-            else if (e.data === 0) { stopTicker(); completeLesson(l.id); }                                    // 播完
+            state = e.data;
+            if (e.data === 1) { everPlayed = true; stopTicker(); ytTimer = setInterval(tick, 500); setShield("playing"); playBtn.textContent = "❚❚"; paintTime(); }
+            else if (e.data === 2) { stopTicker(); paintTime(); snapshotProgress(true); setShield("paused"); playBtn.textContent = "▶"; }
+            else if (e.data === 0) { stopTicker(); completeLesson(l.id); setShield("ended"); playBtn.textContent = "↻"; }
           },
           onError: e => showMediaError([101, 150, 153].includes(e.data) ? "這支影片不允許嵌入播放，請管理員改用允許嵌入的影片。" : [100].includes(e.data) ? "找不到這支影片（可能已刪除或設為私人）。" : "影片無法播放（代碼 " + e.data + "）。")
         }
       });
-    } else if (++tries > 40) showMediaError("YouTube 播放器載入失敗：請檢查網路，或關閉會阻擋 youtube.com 的廣告攔截器後重新整理。");
+    } else if (++tries > 40) showMediaError("影片播放器載入失敗：請檢查網路，或關閉會阻擋播放器的廣告攔截器後重新整理。");
     else setTimeout(wait, 300);
   };
   wait();
 }
 
 function closeModal(silent) {
+  if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (_) { /* 忽略 */ } }
   if (activeLesson) snapshotProgress(true); // 同步取得目前位置後再關閉播放器，避免遺失最後幾秒
   const had = activeLesson; activeLesson = null;
   if (ytTimer) { clearInterval(ytTimer); ytTimer = null; }
@@ -367,10 +411,33 @@ function closeModal(silent) {
   }
 }
 document.querySelectorAll("[data-close]").forEach(x => x.addEventListener("click", () => closeModal()));
-document.addEventListener("keydown", e => { if (e.key === "Escape" && activeLesson) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (readerOpen) closeReader(); else if (activeLesson) closeModal(); });
 // 手機切到背景、鎖屏、關閉分頁時，盡量把最後進度存起來
 document.addEventListener("visibilitychange", () => { if (document.hidden) snapshotProgress(true); });
 window.addEventListener("pagehide", () => snapshotProgress(true));
+
+/* ───────────── 閱讀（FlipHTML5 電子書） ───────────── */
+let readerOpen = false;
+function renderBooks() {
+  let html = books.map(b => { const cv = safeCover(b.cover); return `<article class="book-card" data-book="${esc(b.id)}"><div class="book-cover">${cv ? `<img src="${esc(cv)}" alt="${esc(b.title)}" loading="lazy">` : `<div class="book-cover-ph">◫</div>`}${b.requiresApproval ? '<span class="book-lock">審核專區</span>' : ""}</div><h3>${esc(b.title)}</h3><p>${esc(b.description || "")}</p></article>`; }).join("");
+  if (!html) html = "<div class='empty-state' style='grid-column:1/-1'>目前還沒有書本。</div>";
+  if (!isApproved()) html += "<div class='empty-state' style='grid-column:1/-1'>🔒 部分書本需要管理員核准後才會顯示。核准後請按右上角 ↻ 重新整理。</div>";
+  $("bookGrid").innerHTML = html;
+  $("bookGrid").querySelectorAll("[data-book]").forEach(el => el.onclick = () => openBook(el.dataset.book));
+}
+function openBook(id) {
+  const b = books.find(x => x.id === id); if (!b) return;
+  if (b.requiresApproval && !isApproved()) { toast("此書需要管理員審核通過"); return; }
+  const url = parseFlip(b.link); if (!url) { toast("這本書的連結無法使用，請管理員重新編輯"); return; }
+  $("readerTitle").textContent = b.title;
+  $("readerBody").innerHTML = `<iframe src="${esc(url)}" title="${esc(b.title)}" allowfullscreen allow="fullscreen"></iframe>`;
+  $("readerModal").classList.remove("hidden"); document.body.classList.add("modal-open"); readerOpen = true;
+}
+function closeReader() {
+  $("readerBody").innerHTML = ""; $("readerModal").classList.add("hidden"); readerOpen = false;
+  if (!activeLesson) document.body.classList.remove("modal-open");
+}
+$("readerClose").addEventListener("click", closeReader);
 
 /* ───────────── 筆記 ───────────── */
 let savingNote = false;
@@ -438,7 +505,7 @@ $("lessonForm").onsubmit = async e => {
     form.reset(); applyLessonTypeUI(); await reload(false);
   }, "學習內容已新增");
 };
-const adminLessonRow = l => `<div class="admin-item" style="padding-left:25px"><div><b>${esc(l.title)}</b><small>${l.type === "mp3" ? "MP3" : "YouTube"}</small></div><button class="mini-btn danger" data-dellesson="${esc(l.id)}">刪除內容</button></div>`;
+const adminLessonRow = l => `<div class="admin-item" style="padding-left:25px"><div><b>${esc(l.title)}</b><small>${l.type === "mp3" ? "MP3" : "YouTube"}</small></div><div class="admin-actions"><button class="mini-btn" data-editlesson="${esc(l.id)}">編輯</button><button class="mini-btn danger" data-dellesson="${esc(l.id)}">刪除內容</button></div></div>`;
 async function loadAdmin() {
   if (!isAdmin) return;
   refreshCategoryOptions();
@@ -466,6 +533,52 @@ async function loadAdmin() {
   box.querySelectorAll("[data-dellesson]").forEach(b => b.onclick = async () => {
     if (!confirm("確定刪除此學習內容？")) return;
     await run(async () => { await deleteDoc(doc(db, "lessons", b.dataset.dellesson)); await reload(false); }, "學習內容已刪除");
+  });
+
+  box.querySelectorAll("[data-editlesson]").forEach(btn => btn.onclick = () => {
+    const id = btn.dataset.editlesson; if (box.querySelector(`[data-editform="${id}"]`)) return;
+    const l = lessons.find(x => x.id === id); if (!l) return;
+    const cur = l.type === "mp3" ? (driveIdOf(l.mediaId) ? `https://drive.google.com/file/d/${l.mediaId}/view` : l.mediaId) : `https://youtu.be/${l.mediaId}`;
+    const row = btn.closest(".admin-item");
+    row.insertAdjacentHTML("afterend", `<form class="form-stack edit-form" data-editform="${esc(id)}"><label>內容標題<input class="ef-title" required value="${esc(l.title)}"></label><label>內容說明<input class="ef-desc" value="${esc(l.description || "")}"></label><label>${l.type === "mp3" ? "MP3 來源連結" : "YouTube 連結"}<input class="ef-media" required value="${esc(cur)}"></label><div class="edit-actions"><button class="btn btn-primary btn-small">儲存</button><button type="button" class="btn btn-ghost btn-small ef-cancel">取消</button></div></form>`);
+    const form = row.nextElementSibling;
+    form.querySelector(".ef-cancel").onclick = () => form.remove();
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const title = form.querySelector(".ef-title").value.trim(), raw = form.querySelector(".ef-media").value;
+      const mediaId = l.type === "mp3" ? parseMp3Source(raw) : parseYoutube(raw);
+      if (!title) { toast("請輸入標題"); return; }
+      if (!mediaId) { toast(l.type === "mp3" ? "無法辨識 MP3 來源" : "無法辨識 YouTube 連結"); return; }
+      await run(async () => { await updateDoc(doc(db, "lessons", id), { title, description: form.querySelector(".ef-desc").value.trim(), mediaId }); await reload(false); }, "已更新");
+    };
+  });
+
+  // 書本
+  $("adminBookList").innerHTML = books.map(b => { const cv = safeCover(b.cover); return `<div class="admin-item"><div class="admin-book"><div class="admin-thumb">${cv ? `<img src="${esc(cv)}" alt="">` : "◫"}</div><div><b>${esc(b.title)}</b><small>${b.requiresApproval ? "需審核" : "開放"}</small></div></div><div class="admin-actions"><button class="mini-btn" data-editbook="${esc(b.id)}">編輯</button><button class="mini-btn danger" data-delbook="${esc(b.id)}">刪除</button></div></div>`; }).join("") || "<div class='empty-state'>尚未新增書本。</div>";
+  const bbox = $("adminBookList");
+  bbox.querySelectorAll("[data-delbook]").forEach(btn => btn.onclick = async () => {
+    if (!confirm("確定刪除這本書？")) return;
+    await run(async () => { await deleteDoc(doc(db, "books", btn.dataset.delbook)); await reload(false); }, "書本已刪除");
+  });
+  bbox.querySelectorAll("[data-editbook]").forEach(btn => btn.onclick = () => {
+    const id = btn.dataset.editbook; if (bbox.querySelector(`[data-editform="${id}"]`)) return;
+    const b = books.find(x => x.id === id); if (!b) return;
+    const row = btn.closest(".admin-item");
+    row.insertAdjacentHTML("afterend", `<form class="form-stack edit-form" data-editform="${esc(id)}"><label>書名<input class="ef-title" required value="${esc(b.title)}"></label><label>簡介<input class="ef-desc" value="${esc(b.description || "")}"></label><label>FlipHTML5 連結<input class="ef-link" required value="${esc(b.link)}"></label><label>更換封面（不選則維持原封面）<input class="ef-file" type="file" accept="image/*"></label><label class="check-row"><input class="ef-appr" type="checkbox" ${b.requiresApproval ? "checked" : ""}> 需要審核會員才能閱讀</label><div class="edit-actions"><button class="btn btn-primary btn-small">儲存</button><button type="button" class="btn btn-ghost btn-small ef-cancel">取消</button></div></form>`);
+    const form = row.nextElementSibling;
+    form.querySelector(".ef-cancel").onclick = () => form.remove();
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const title = form.querySelector(".ef-title").value.trim(), link = parseFlip(form.querySelector(".ef-link").value);
+      if (!title) { toast("請輸入書名"); return; }
+      if (!link) { toast("無法辨識 FlipHTML5 連結：請貼 https://online.fliphtml5.com/... 或嵌入碼"); return; }
+      await run(async () => {
+        const f = form.querySelector(".ef-file").files[0];
+        const cover = f ? await fileToCover(f) : (b.cover || "");
+        await updateDoc(doc(db, "books", id), { title, description: form.querySelector(".ef-desc").value.trim(), link, cover, requiresApproval: form.querySelector(".ef-appr").checked });
+        await reload(false);
+      }, "書本已更新");
+    };
   });
 
   // 公告
@@ -497,6 +610,39 @@ document.querySelectorAll("[data-admin-tab]").forEach(b => b.onclick = () => {
   document.querySelectorAll(".admin-pane").forEach(x => x.classList.add("hidden"));
   $("admin-" + b.dataset.adminTab).classList.remove("hidden");
 });
+// 封面圖片：在瀏覽器內縮小成最長邊 420px 的 JPEG，直接存進 Firestore（免費、不需要 Firebase Storage）
+function fileToCover(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 420 / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+      const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      let out = c.toDataURL("image/jpeg", 0.8); if (out.length > 300000) out = c.toDataURL("image/jpeg", 0.6);
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("無法讀取這張圖片")); };
+    img.src = url;
+  });
+}
+let bookCoverData = "";
+$("bookCoverFile").addEventListener("change", async () => {
+  const f = $("bookCoverFile").files[0], pv = $("bookCoverPreview"); bookCoverData = "";
+  if (!f) { pv.classList.add("hidden"); return; }
+  try { bookCoverData = await fileToCover(f); pv.src = bookCoverData; pv.classList.remove("hidden"); } catch (e) { toast(e.message); }
+});
+$("bookForm").onsubmit = async e => {
+  e.preventDefault();
+  const title = $("bookTitle").value.trim(), link = parseFlip($("bookLink").value), url = $("bookCoverUrl").value.trim();
+  if (!title) { toast("請輸入書名"); return; }
+  if (!link) { toast("無法辨識 FlipHTML5 連結：請貼 https://online.fliphtml5.com/... 或嵌入碼"); return; }
+  if (url && !/^https:\/\//i.test(url)) { toast("封面網址必須是 https 開頭"); return; }
+  const form = e.target;
+  await run(async () => {
+    await addDoc(collection(db, "books"), { title, description: $("bookDesc").value.trim(), link, cover: bookCoverData || url, requiresApproval: $("bookApproval").checked, createdAt: serverTimestamp() });
+    form.reset(); bookCoverData = ""; $("bookCoverPreview").classList.add("hidden"); await reload(false);
+  }, "書本已新增");
+};
 $("announcementForm").onsubmit = async e => {
   e.preventDefault(); const form = e.target;
   await run(async () => {
