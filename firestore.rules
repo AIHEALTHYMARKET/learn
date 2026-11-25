@@ -21,15 +21,23 @@ service cloud.firestore {
     }
     function approved() { return isAdmin() || isApprovedMember(); }
 
+    // 本人是否已被核准進入這個分類（categoryAccess/{分類ID}_{uid}.status == "approved"）
+    function hasCategoryAccess(categoryId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/categoryAccess/$(categoryId + "_" + request.auth.uid))
+        && get(/databases/$(database)/documents/categoryAccess/$(categoryId + "_" + request.auth.uid)).data.status == "approved";
+    }
+
     // 這個分類目前的使用者能不能讀？
     //   公開分類（requiresApproval 不是 true，且 type 不是 nutrition）→ 所有登入者
-    //   審核分類 / 營養課程                                      → 管理員或已核准會員
+    //   審核分類 / 營養課程                                      → 管理員，或已被核准進入該分類的人
     function canReadCategory(categoryId) {
       return exists(/databases/$(database)/documents/categories/$(categoryId))
         && (
           (get(/databases/$(database)/documents/categories/$(categoryId)).data.get('requiresApproval', false) != true
             && get(/databases/$(database)/documents/categories/$(categoryId)).data.type != "nutrition")
-          || approved()
+          || isAdmin()
+          || hasCategoryAccess(categoryId)
         );
     }
 
@@ -80,6 +88,25 @@ service cloud.firestore {
       // 登入者可看到分類名稱與簡介；真正的課程內容由 lessons 規則把關
       allow read: if signedIn();
       allow create, update, delete: if isAdmin();
+    }
+
+    // ───────── 分類進入申請 ─────────
+    // 文件 ID 固定為「分類ID_uid」，每人每個分類只會有一筆。
+    match /categoryAccess/{accessId} {
+      // 本人只能（用 uid 條件）查自己的；管理員可讀全部
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // 只能替自己建立「待審核」申請；不能自己寫 approved，也不能覆寫既有紀錄
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["categoryId", "uid", "email", "name", "status", "requestedAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == "pending"
+        && accessId == request.resource.data.categoryId + "_" + request.auth.uid
+        && exists(/databases/$(database)/documents/categories/$(request.resource.data.categoryId));
+
+      // 核准、拒絕、撤銷都只有管理員能做
+      allow update, delete: if isAdmin();
     }
 
     // ───────── 課程內容 ─────────
