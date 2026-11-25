@@ -63,10 +63,23 @@ export function parseMp3Source(value) {
   return null;
 }
 
+// 這個 mediaId 是 Google Drive 檔案 ID 嗎？是的話回傳 ID，否則 null
+export function driveIdOf(mediaId) {
+  const v = String(mediaId ?? "").trim();
+  return DRIVE_ID.test(v) ? v : null;
+}
+// Drive 的直連候選網址（依序嘗試）：新版 usercontent 網域（加 confirm=t 略過大檔案確認頁）→ 舊版 uc
+export function driveSources(id) {
+  const e = encodeURIComponent(id);
+  return [
+    "https://drive.usercontent.google.com/download?id=" + e + "&export=download&confirm=t",
+    "https://drive.google.com/uc?export=download&id=" + e
+  ];
+}
 // Firestore 裡的 mediaId → <audio src>
 export function audioSrc(mediaId) {
   const v = String(mediaId ?? "").trim();
   if (/^https:\/\//i.test(v)) return v;
   if (AUDIO_EXT.test(v) && !DRIVE_ID.test(v)) return v.includes("%") ? v : encodeURI(v);
-  return "https://drive.google.com/uc?export=download&id=" + encodeURIComponent(v);
+  return driveSources(v)[0];
 }

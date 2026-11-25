@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, getDocs, query, where, orderBy, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
-import { esc, secs, fmtTime, parseYoutube, parseMp3Source, audioSrc } from "./helpers.js";
+import { esc, secs, fmtTime, parseYoutube, parseMp3Source, audioSrc, driveIdOf, driveSources } from "./helpers.js";
 
 /* ───────────── 設定 ───────────── */
 // 管理員 Gmail。必須與 firestore.rules 裡的 isAdmin() Email 完全相同。
@@ -302,7 +302,27 @@ function setupAudio(p) {
   });
   audio.addEventListener("pause", () => { if (!audio.ended) snapshotProgress(true); });
   audio.addEventListener("ended", () => completeLesson(activeLesson?.id));
-  audio.addEventListener("error", () => showMediaError("音檔無法播放：請確認檔案已設為「知道連結的任何人可檢視」，或改用 GitHub 倉庫內的 MP3／其他可直接串流的 https 網址。"));
+  // Drive 檔案播放失敗時：依序換備援網址 → 仍失敗就改用 Drive 內建播放器（可聽，但無法自動記錄進度）
+  let srcIdx = 0;
+  audio.addEventListener("error", () => {
+    const id = driveIdOf(activeLesson?.mediaId);
+    if (id) {
+      const list = driveSources(id);
+      if (srcIdx < list.length - 1) { srcIdx++; audio.src = list[srcIdx]; audio.load(); return; }
+      showDrivePreview(id); return;
+    }
+    showMediaError("音檔無法播放：請確認網址可直接開啟播放（https 直連 mp3）。");
+  });
+}
+function showDrivePreview(id) {
+  const lessonId = activeLesson?.id; if (!lessonId) return;
+  audioEl = null;
+  $("mediaFrame").classList.remove("audio");
+  $("mediaFrame").innerHTML = `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(id)}/preview" allow="autoplay" style="width:100%;height:100%;border:0"></iframe>`;
+  const e = $("mediaError");
+  e.innerHTML = `已改用 Google Drive 內建播放器。此模式無法自動記錄進度與續播，聽完後請按：<button id="markDone" class="btn btn-primary btn-small" style="margin-left:8px">標記為已完成</button>`;
+  e.classList.remove("hidden");
+  $("markDone").onclick = () => completeLesson(lessonId);
 }
 
 function setupYoutube(l, p) {
