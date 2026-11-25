@@ -19,7 +19,7 @@ if (!configMissing) { const app = initializeApp(firebaseConfig); auth = getAuth(
 
 /* ───────────── 狀態 ───────────── */
 let currentUser = null, isAdmin = false, profile = null;
-let categories = [], lessons = [], progressMap = {}, notes = [], announcements = [], books = [];
+let categories = [], lessons = [], progressMap = {}, notes = [], announcements = [], books = [], accessMap = {};
 let currentCategory = null, currentView = "home";
 let activeLesson = null, audioEl = null, ytPlayer = null, ytTimer = null, lastSaveAt = 0, lastSavedPos = -1;
 
@@ -28,8 +28,11 @@ let toastTimer;
 const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200); };
 const dateText = () => new Intl.DateTimeFormat("zh-TW", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(new Date());
 const isAdminUser = u => !!u?.email && u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-const isApproved = () => isAdmin || profile?.status === "approved";
-const categoryAllowed = c => isAdmin || ((!c.requiresApproval || isApproved()) && (c.type !== "nutrition" || isApproved()));
+const isApproved = () => isAdmin || profile?.status === "approved"; // 舊制整體會員資格：目前只用在「需審核的書本」
+// 分類進入權限：營養課程與「需審核」的分類，要先提出申請，管理員核准後才能進入
+const needsApproval = c => c.type === "nutrition" || !!c.requiresApproval;
+const accessStatus = c => accessMap[c.id] || "";   // "" | "pending" | "approved"
+const categoryAllowed = c => isAdmin || !needsApproval(c) || accessMap[c.id] === "approved";
 const progressFor = id => progressMap[id] || { percent: 0, completed: false, position: 0 };
 const catName = id => categories.find(c => c.id === id)?.name || "未分類";
 const nowStamp = () => ({ seconds: Math.floor(Date.now() / 1000) });
@@ -78,13 +81,16 @@ if (auth) getRedirectResult(auth).catch(e => { $("loginError").textContent = aut
 async function loadAll() {
   isAdmin = isAdminUser(currentUser);
   const uid = currentUser.uid;
-  const [p, c, pr, n, a] = await Promise.all([
+  const [p, c, pr, n, a, ac] = await Promise.all([
     getDoc(doc(db, "users", uid)),
     getDocs(query(collection(db, "categories"), orderBy("createdAt", "asc"))),
     getDocs(collection(db, "users", uid, "progress")),
     getDocs(collection(db, "users", uid, "notes")),
-    getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")))
+    getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc"))),
+    // 我的分類申請紀錄（Rules 只允許用 uid 條件查自己的）
+    getDocs(query(collection(db, "categoryAccess"), where("uid", "==", uid))).catch(e => { console.warn("讀取分類申請失敗（Firestore Rules 可能尚未更新）", e.code); return null; })
   ]);
+  accessMap = {}; ac?.forEach(d => { const x = d.data(); if (x.categoryId) accessMap[x.categoryId] = x.status; });
   if (p.exists()) profile = p.data();
   else {
     const base = { email: currentUser.email, name: currentUser.displayName || "", photoURL: currentUser.photoURL || "", status: "pending", createdAt: serverTimestamp() };
@@ -119,9 +125,9 @@ function renderShell(reset) {
   $("userAvatar").textContent = (currentUser.displayName || "U").slice(0, 1).toUpperCase();
   $("dateLabel").textContent = dateText().toUpperCase();
   $("adminNavWrap").classList.toggle("hidden", !isAdmin);
-  const approved = isApproved();
-  $("approvalBanner").classList.toggle("hidden", approved);
-  if (!approved) $("approvalBanner").textContent = "你的帳號已完成登入，目前狀態為「待審核」。管理員核准後，請按右上角 ↻ 重新整理，即可使用營養課程及需審核的 MP3 分類。一般開放分類仍可正常學習。";
+  const pendingN = categories.filter(c => accessMap[c.id] === "pending").length;
+  $("approvalBanner").classList.toggle("hidden", !pendingN);
+  if (pendingN) $("approvalBanner").textContent = `你有 ${pendingN} 個分類的進入申請正在等待管理員審核。核准後請按右上角 ↻ 重新整理，即可進入該分類。`;
   if (reset) { currentView = "home"; currentCategory = null; }
   setView(currentView, !reset);
 }
@@ -160,7 +166,7 @@ function loadErrorText(e) {
 }
 function resetState() {
   closeModal(true); closeReader();
-  currentUser = null; isAdmin = false; profile = null; categories = []; lessons = []; progressMap = {}; notes = []; announcements = []; books = []; currentCategory = null; currentView = "home";
+  currentUser = null; isAdmin = false; profile = null; categories = []; lessons = []; progressMap = {}; notes = []; announcements = []; books = []; accessMap = {}; currentCategory = null; currentView = "home";
   $("appShell").classList.add("hidden"); $("loginScreen").classList.remove("hidden");
 }
 if (auth) onAuthStateChanged(auth, async user => {
@@ -194,31 +200,43 @@ function renderHome() {
   $("newList").innerHTML = announcements.slice(0, 3).map(a => `<div class="new-row"><div class="lesson-thumb">✦</div><div class="lesson-row-main"><b>${esc(a.title)}</b><small>${esc(a.body)}</small></div></div>`).join("")
     || lessons.slice(-3).reverse().map(l => `<div class="new-row"><div class="lesson-thumb">${l.type === "mp3" ? "♫" : "✧"}</div><div class="lesson-row-main"><b>${esc(l.title)}</b><small>${esc(catName(l.categoryId))}</small></div><span class="new-badge">NEW</span></div>`).join("")
     || "<div class='empty-state'>目前沒有新課程。</div>";
-  $("homeCategories").innerHTML = ["mp3", "nutrition"].map(type => categoryCardHtml(categories.filter(c => c.type === type && categoryAllowed(c)), true)).join("") || "<div class='empty-state'>目前沒有可瀏覽的分類。</div>";
+  $("homeCategories").innerHTML = ["mp3", "nutrition"].map(type => categoryCardHtml(categories.filter(c => c.type === type), true)).join("") || "<div class='empty-state'>目前沒有可瀏覽的分類。</div>";
   bindCategoryCards();
   $("continueList").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openLesson(b.dataset.open));
 }
 function categoryCardHtml(list, quiet) {
-  return list.map(c => `<article class="category-card" data-category="${esc(c.id)}"><div class="category-icon">${c.type === "mp3" ? "♫" : "✧"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description || "依照主題循序學習，累積知識與實戰能力。")}</p><div class="category-meta"><span>${lessons.filter(l => l.categoryId === c.id).length} 個單元</span><span>${c.requiresApproval || c.type === "nutrition" ? "審核專區" : "開放學習"}　→</span></div></article>`).join("")
+  return list.map(c => {
+    const ok = categoryAllowed(c), st = accessStatus(c);
+    const count = ok ? `${lessons.filter(l => l.categoryId === c.id).length} 個單元` : "🔒 需申請進入";
+    const tag = ok ? (needsApproval(c) ? "審核專區 ✓" : "開放學習") : (st === "pending" ? "審核中…" : "申請進入");
+    return `<article class="category-card${ok ? "" : " locked"}" data-category="${esc(c.id)}"><div class="category-icon">${c.type === "mp3" ? "♫" : "✧"}</div><h3>${esc(c.name)}</h3><p>${esc(c.description || "依照主題循序學習，累積知識與實戰能力。")}</p><div class="category-meta"><span>${count}</span><span>${tag}　→</span></div></article>`;
+  }).join("")
     || (quiet ? "" : "<div class='empty-state'>目前沒有可瀏覽的分類。</div>");
 }
 function bindCategoryCards() { document.querySelectorAll("[data-category]").forEach(el => el.onclick = () => openCategory(el.dataset.category)); }
 function renderCategories(type) {
   currentCategory = null;
-  const list = categories.filter(c => c.type === type && categoryAllowed(c));
+  const list = categories.filter(c => c.type === type);
   const target = $(type === "mp3" ? "mp3Categories" : "nutritionCategories");
   target.classList.remove("hidden"); $(type === "mp3" ? "mp3Lessons" : "nutritionLessons").classList.add("hidden");
-  let html = categoryCardHtml(list);
-  const lockedCount = categories.filter(c => c.type === type && !categoryAllowed(c)).length;
-  if (!isApproved() && lockedCount) {
-    const note = `<div class="empty-state" style="grid-column:1/-1">🔒 ${type === "nutrition" ? "營養課程" : `另有 ${lockedCount} 個分類`}需要管理員審核通過後才能進入。核准後請按右上角 ↻ 重新整理。</div>`;
-    html = list.length ? html + note : note;
-  }
-  target.innerHTML = html; bindCategoryCards();
+  target.innerHTML = categoryCardHtml(list); bindCategoryCards();
+}
+// 第一次進入需審核的分類：送出申請，等管理員核准
+async function requestAccess(c) {
+  if (accessMap[c.id] === "pending") { toast(`你已送出「${c.name}」的申請，請等候管理員審核`); return; }
+  if (!confirm(`「${c.name}」需要管理員核准才能進入。\n要送出進入申請嗎？`)) return;
+  const ok = await run(async () => {
+    await setDoc(doc(db, "categoryAccess", c.id + "_" + currentUser.uid), {
+      categoryId: c.id, uid: currentUser.uid, email: currentUser.email, name: currentUser.displayName || "",
+      status: "pending", requestedAt: serverTimestamp()
+    });
+    accessMap[c.id] = "pending";
+  }, "申請已送出，管理員核准後即可進入");
+  if (ok) renderShell(false);
 }
 function openCategory(id) {
   const c = categories.find(x => x.id === id); if (!c) return;
-  if (!categoryAllowed(c)) { toast("此分類需要管理員審核通過"); return; }
+  if (!categoryAllowed(c)) { requestAccess(c); return; }
   currentCategory = c;
   const type = c.type, cats = $(type === "mp3" ? "mp3Categories" : "nutritionCategories"), box = $(type === "mp3" ? "mp3Lessons" : "nutritionLessons");
   cats.classList.add("hidden"); box.classList.remove("hidden");
@@ -525,7 +543,8 @@ async function loadAdmin() {
     if (!confirm(`刪除此分類${n ? `，以及分類內的 ${n} 個學習內容` : ""}？此動作無法復原。`)) return;
     await run(async () => {
       const snap = await getDocs(query(collection(db, "lessons"), where("categoryId", "==", id)));
-      const refs = snap.docs.map(d => d.ref);
+      const acc = await getDocs(query(collection(db, "categoryAccess"), where("categoryId", "==", id))); // 一併清掉這個分類的申請紀錄
+      const refs = [...snap.docs, ...acc.docs].map(d => d.ref);
       for (let i = 0; i < refs.length; i += 400) { const batch = writeBatch(db); refs.slice(i, i + 400).forEach(r => batch.delete(r)); await batch.commit(); }
       await deleteDoc(doc(db, "categories", id)); await reload(false);
     }, "分類已刪除");
@@ -588,7 +607,29 @@ async function loadAdmin() {
     await run(async () => { await deleteDoc(doc(db, "announcements", b.dataset.delannounce)); await reload(false); }, "公告已刪除");
   });
 
-  // 會員審核
+  // 分類進入申請
+  try {
+    const snap = await getDocs(collection(db, "categoryAccess"));
+    const catOf = r => categories.find(c => c.id === r.categoryId);
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(catOf);
+    const pend = rows.filter(r => r.status !== "approved").sort((x, y) => secs(x.requestedAt) - secs(y.requestedAt));
+    const appr = rows.filter(r => r.status === "approved").sort((x, y) => catOf(x).name.localeCompare(catOf(y).name) || String(x.name || x.email).localeCompare(String(y.name || y.email)));
+    const when = t => secs(t) ? new Date(secs(t) * 1000).toLocaleString("zh-TW", { hour12: false }) : "";
+    $("accessPendingCount").textContent = pend.length + " 待處理";
+    $("accessPending").innerHTML = pend.length ? pend.map(r => `<div class="member-row"><div><b>${esc(r.name || "未提供名稱")}　→　${esc(catOf(r).name)}</b><small>${esc(r.email || "")} · 申請於 ${esc(when(r.requestedAt))}</small></div><div class="admin-actions"><button class="btn btn-primary btn-small" data-grant="${esc(r.id)}">核准</button><button class="mini-btn danger" data-deny="${esc(r.id)}">拒絕</button></div></div>`).join("") : "<div class='empty-state'>目前沒有待審核的申請。</div>";
+    $("accessApproved").innerHTML = appr.map(r => `<div class="member-row"><div><b>${esc(r.name || "會員")}　→　${esc(catOf(r).name)}</b><small>${esc(r.email || "")}</small></div><button class="mini-btn danger" data-revokeaccess="${esc(r.id)}">撤銷</button></div>`).join("") || "<div class='empty-state'>尚無已核准的分類權限。</div>";
+    $("accessPending").querySelectorAll("[data-grant]").forEach(b => b.onclick = () => run(async () => { await updateDoc(doc(db, "categoryAccess", b.dataset.grant), { status: "approved", approvedAt: serverTimestamp() }); await loadAdmin(); }, "已核准進入該分類"));
+    $("accessPending").querySelectorAll("[data-deny]").forEach(b => b.onclick = async () => {
+      if (!confirm("拒絕這項申請？對方之後可以重新申請。")) return;
+      await run(async () => { await deleteDoc(doc(db, "categoryAccess", b.dataset.deny)); await loadAdmin(); }, "已拒絕申請");
+    });
+    $("accessApproved").querySelectorAll("[data-revokeaccess]").forEach(b => b.onclick = async () => {
+      if (!confirm("撤銷此會員進入該分類的權限？對方之後需重新申請。")) return;
+      await run(async () => { await deleteDoc(doc(db, "categoryAccess", b.dataset.revokeaccess)); await loadAdmin(); }, "已撤銷分類權限");
+    });
+  } catch (e) { console.error(e); $("accessPending").innerHTML = "<div class='empty-state'>讀取申請失敗：" + esc(e.code || e.message) + "（請確認 Firestore Rules 已發布最新版）</div>"; }
+
+  // 舊制會員審核（目前只用於「需審核的書本」）
   try {
     const users = await getDocs(collection(db, "users")); const pending = [], approved = [];
     users.forEach(d => { const u = { id: d.id, ...d.data() }; if (u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return; (u.status === "approved" ? approved : pending).push(u); });
