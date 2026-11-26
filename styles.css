@@ -135,3 +135,69 @@ body.modal-open{overflow:hidden}
 .bp img{max-width:110px;max-height:64px;object-fit:contain}
 .bp-light{background:#fff;flex:1 1 110px}.bp-dark{background:#17243a;flex:1 1 110px}
 .bp-tab{background:#e9edf3;border-radius:12px 12px 4px 4px;flex:1 1 190px;justify-content:flex-start}.bp-tab img{width:16px;height:16px}
+
+html[data-theme="dark"] :where(.login-card){background:#172235}
+html[data-theme="dark"] :where(.error-text){color:#e2c585}
+html[data-theme="dark"] :where(.side-label){color:#a9b4c6}
+html[data-theme="dark"] :where(.stat-card),html[data-theme="dark"] :where(.panel){background:#172235;border:1px solid #2b3850}
+html[data-theme="dark"] :where(.stat-top){color:#a9b4c6}
+html[data-theme="dark"] :where(.progress-track){background:#243249}
+html[data-theme="dark"] :where(.new-badge){background:#243249}
+html[data-theme="dark"] :where(.lesson-row),html[data-theme="dark"] :where(.new-row){border:1px solid #2b3850}
+html[data-theme="dark"] :where(.lesson-thumb){background:#243249}
+html[data-theme="dark"] :where(.category-card){border:1px solid #2b3850}
+html[data-theme="dark"] :where(.category-icon){background:#243249}
+html[data-theme="dark"] :where(.tip-strip){background:#243249;border:1px solid #2b3850;color:#e2c585}
+html[data-theme="dark"] :where(.notice){background:#111a2b;border:1px solid #2b3850;color:#e2c585}
+html[data-theme="dark"] :where(.back-btn){color:#a9b4c6}
+html[data-theme="dark"] :where(.lesson-card){background:#172235}
+html[data-theme="dark"] :where(.status-pill){background:#243249}
+html[data-theme="dark"] :where(.status-pill.done){background:#243249}
+html[data-theme="dark"] :where(.status-pill.started){background:#111a2b}
+html[data-theme="dark"] :where(.modal-card){background:#172235}
+html[data-theme="dark"] :where(.modal-close){background:#243249;color:#a9b4c6}
+html[data-theme="dark"] :where(.note-editor label),html[data-theme="dark"] :where(.form-stack label){color:#a9b4c6}
+html[data-theme="dark"] :where(.note-editor textarea),html[data-theme="dark"] :where(.form-stack input),html[data-theme="dark"] :where(.form-stack select),html[data-theme="dark"] :where(.form-stack textarea){border:1px solid #2b3850;background:#172235}
+html[data-theme="dark"] :where(.tab){background:#172235;color:#a9b4c6}
+html[data-theme="dark"] :where(.admin-item){border-bottom:1px solid #2b3850}
+html[data-theme="dark"] :where(.mini-btn){background:#172235;color:#a9b4c6}
+html[data-theme="dark"] :where(.mini-btn.danger){color:#e2c585}
+html[data-theme="dark"] :where(.member-row){border-bottom:1px solid #2b3850}
+html[data-theme="dark"] :where(.note-card){background:#172235}
+html[data-theme="dark"] :where(.note-card p){color:#a9b4c6}
+html[data-theme="dark"] :where(.btn-ghost){background:#243249;color:#a9b4c6}
+html[data-theme="dark"] :where(.yt-rate option){color:#a9b4c6}
+html[data-theme="dark"] :where(.book-card){background:#172235;border:1px solid #2b3850}
+html[data-theme="dark"] :where(.book-cover){background:#243249}
+html[data-theme="dark"] :where(.reader-body){background:#172235}
+html[data-theme="dark"] :where(.edit-form){background:#111a2b;border:1px solid #2b3850}
+html[data-theme="dark"] :where(.cover-preview){border:1px solid #2b3850}
+html[data-theme="dark"] :where(.admin-thumb){background:#243249}
+html[data-theme="dark"] :where(.bp){color:#a9b4c6}
+html[data-theme="dark"] :where(.bp-light){background:#172235}
+html[data-theme="dark"] :where(.bp-tab){background:#243249}
+/* ═════════ 淺色／深色主題（跟隨裝置，可手動切換）═════════ */
+html{color-scheme:light}
+html[data-theme="dark"]{color-scheme:dark;--ink:#e8edf5;--muted:#9aa5b8;--paper:#0e1522;--line:#2b3850;--white:#172235;--shadow:0 18px 45px rgba(0,0,0,.35)}
+html[data-theme="dark"] .login-screen{background:radial-gradient(circle at 78% 15%,#24324a 0,#121b2c 30%,#080d16 72%)}
+html[data-theme="dark"] :where(.stat-feature,.category-card){background:linear-gradient(145deg,#172235,#131d2f)}
+html[data-theme="dark"] :where(.status-pill.done){color:#5fd1a6;background:#16352f}
+html[data-theme="dark"] :where(.status-pill.started){color:#e2c585;background:#33291a}
+html[data-theme="dark"] :where(.mini-btn.danger,.error-text){color:#f08a8a}
+html[data-theme="dark"] :where(.tip-strip){color:#e2c585;background:#2a2417;border-color:#44381f}
+html[data-theme="dark"] :where(.notice){color:#e2c585;background:#2a2417;border-color:#44381f}
+html[data-theme="dark"] :where(.text-btn,.new-badge,.lesson-thumb,.category-icon){color:#e0bd7a}
+html[data-theme="dark"] :where(.lesson-card,.category-card,.book-card,.stat-card,.panel,.note-card):hover{box-shadow:0 17px 32px rgba(0,0,0,.45)}
+html[data-theme="dark"] .modal-backdrop{background:#000a}
+html[data-theme="dark"] ::placeholder{color:#7d899d}
+html[data-theme="dark"] .edit-form{background:#111a2b;border-color:#2b3850}
+html[data-theme="dark"] :where(.icon-btn,.back-btn){background:#172235;color:#a9b4c6}
+
+/* 主題切換按鈕 */
+.theme-btn{width:auto;min-width:38px;padding:0 12px;gap:6px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.theme-btn .ti{font-size:15px;line-height:1}
+.theme-btn .tl{font-size:12px;font-weight:700}
+.theme-float{position:absolute;top:16px;right:16px;z-index:3;height:38px;border-radius:12px;border:1px solid #ffffff2e;background:#ffffff1c;color:#fff}
+@media(max-width:760px){.theme-btn .tl{display:none}.theme-btn{padding:0;width:38px}.theme-float .tl{display:inline}.theme-float{width:auto;padding:0 12px}}
+.theme-btn .ti{font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols2",sans-serif}
+@media(max-width:760px){.theme-btn .ti{font-size:18px}}

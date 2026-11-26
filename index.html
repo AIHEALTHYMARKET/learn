@@ -10,11 +10,13 @@
   <meta property="og:image" content="og-image.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="og-image.png">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <noscript><p style="padding:24px;font-family:sans-serif">此網站需要啟用 JavaScript 才能使用。</p></noscript>
   <div id="loginScreen" class="login-screen">
+    <button type="button" class="icon-btn theme-btn theme-float" data-theme-toggle><span class="ti">◐</span><span class="tl">自動</span></button>
     <div class="login-card">
       <div class="brand-mark" data-logo="U">U</div>
       <p class="eyebrow">UNFINISHED LEARNING HUB</p>
@@ -41,7 +43,7 @@
     </aside>
 
     <main class="main-area">
-      <header class="topbar"><div><p class="eyebrow" id="dateLabel">Unfinished</p><h2 id="pageTitle">學習總覽</h2></div><div class="top-actions"><span class="online-dot">● 已登入</span><button id="refreshBtn" class="icon-btn" title="重新整理">↻</button><button id="logoutTop" class="icon-btn logout-top" title="登出">登出</button></div></header>
+      <header class="topbar"><div><p class="eyebrow" id="dateLabel">Unfinished</p><h2 id="pageTitle">學習總覽</h2></div><div class="top-actions"><span class="online-dot">● 已登入</span><button type="button" class="icon-btn theme-btn" data-theme-toggle><span class="ti">◐</span><span class="tl">自動</span></button><button id="refreshBtn" class="icon-btn" title="重新整理">↻</button><button id="logoutTop" class="icon-btn logout-top" title="登出">登出</button></div></header>
       <section id="approvalBanner" class="notice hidden"></section>
       <section id="view-home" class="view">
         <div class="welcome-row"><div><p class="eyebrow">WELCOME BACK</p><h1>今天，向前學一點。</h1><p class="muted">每一次聆聽與理解，都會累積成下一次分享的底氣。</p></div><div class="welcome-orb" data-logo="✦">✦</div></div>
