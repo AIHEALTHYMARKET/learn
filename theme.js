@@ -10,7 +10,7 @@
     var p = pref(), t = resolve(p), root = document.documentElement;
     root.setAttribute("data-theme", t); root.setAttribute("data-theme-pref", p); root.style.colorScheme = t;
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", t === "dark" ? "#0e1522" : "#f4f6fa");
+    if (m) m.setAttribute("content", "#101827"); // 與頁首、導覽列同色
     var tip = "外觀：" + LABEL[p][1] + "（點一下切換：自動 → 淺色 → 深色）";
     document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
       var ti = b.querySelector(".ti"), tl = b.querySelector(".tl");

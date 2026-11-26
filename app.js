@@ -126,7 +126,7 @@ function renderShell(reset) {
   $("loginScreen").classList.add("hidden"); $("appShell").classList.remove("hidden");
   $("userName").textContent = currentUser.displayName || "學習者"; $("userEmail").textContent = currentUser.email;
   $("userAvatar").textContent = (currentUser.displayName || "U").slice(0, 1).toUpperCase();
-  $("dateLabel").textContent = "Unfinished";
+  $("welcomeName").textContent = " · " + (currentUser.displayName || "學習者");
   $("adminNavWrap").classList.toggle("hidden", !isAdmin);
   const pendingN = categories.filter(c => accessMap[c.id] === "pending").length;
   $("approvalBanner").classList.toggle("hidden", !pendingN);
@@ -145,7 +145,6 @@ function setView(name, keep = false) {
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + name)?.classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === name));
-  $("pageTitle").textContent = VIEW_TITLES[name] || "學習中心";
   if (name === "home") renderHome();
   else if (name === "mp3" || name === "nutrition") {
     const box = $(name === "mp3" ? "mp3Lessons" : "nutritionLessons");
